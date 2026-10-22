@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Native Layout Lab",
+    "slug": "pretend-native-layout-lab",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "xyz.chaoticka.layoutlab"
+    }
+  }
+}
