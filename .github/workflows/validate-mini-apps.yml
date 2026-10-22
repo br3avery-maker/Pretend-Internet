@@ -19,7 +19,11 @@ jobs:
             [ -f "$f" ] || continue
             python3 scripts/validate-mini-app.py "$(dirname "$f")"
           done
-      - name: Build frontend and check output
+      - name: Verify shell-only build
+        run: |
+          sh scripts/build-frontend.sh
+          sh scripts/check-frontend.sh
+      - name: Verify on-device npm build command
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build

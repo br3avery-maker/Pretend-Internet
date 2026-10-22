@@ -12,24 +12,26 @@ Small, independent, self-explaining mini-apps; no mandatory shared runtime.
 
 ## Build from the GitHub repository root (WebToApp Frontend)
 
-This repository now includes a **real static frontend entry** (`index.html`) and a dependency-free `npm run build` command that produces `dist/index.html`, with the existing Pocket Counter example included.
+The root has a real static entry (`index.html`) and `package.json`. The build script copies the launcher and its existing Pocket Counter example into `dist/`.
+
+**Important WebToApp compatibility:** Its on-device npm environment can run a build script while `node` is not exposed as a shell command. The current build therefore uses **POSIX `sh`, `mkdir`, and `cp` only**. It does not call `node` and downloads no JavaScript build dependencies.
 
 In WebToApp → **Frontend → Import from GitHub**:
 
 1. Enter `https://github.com/br3avery-maker/Pretend-Internet`.
-2. Use branch `main`; leave **Sub-path** empty to import the new root frontend.
-3. Tap **Fetch & Analyze** again so the updated repository is downloaded.
-4. Let WebToApp install Node/npm if requested, run `npm run build`, and use output directory **dist**.
-5. Verify in its preview and **again inside the installed exported APK** before calling it live.
+2. Branch: `main`. **Sub-path: blank** to build the full repository launcher.
+3. Tap **Fetch & Analyze** again to refresh the local copy (remove/reselect an older downloaded workspace if necessary).
+4. Run the `build` script; WebToApp should use `npm run build` and package output directory **`dist`**.
+5. Test WebToApp's preview **and** the exported, installed APK. Report the actual device result before setting any app to `live`.
 
-For the original standalone HTML template, WebToApp's **HTML** app type is a simpler alternative. That example is in `templates/mini-app/`.
+WebToApp may label this minimal static project **Framework: Unknown**. That alone is not an error: there is no React/Vue/Vite framework. If you'd rather skip npm entirely, choose its **HTML** app type and import the static files instead; HTML is the intended type for unbuilt static websites.
 
-**This is a small development launcher, not the finished Pretend Internet or the 16 apps previously packed with WebToApp.** The frontend output currently contains one labeled WIP example. No private services, secrets, or Library sources are bundled.
+**This is a small development launcher, not the finished Pretend Internet or the 16 apps previously packed in Br3Apps.** Only one explicitly WIP example is included. No private services, keys, or Library sources are bundled.
 
-Local build check: `npm ci && npm run build && npm run check` (Node 18+).
+To validate on a regular computer with npm: `npm ci && npm run build && npm run check`. To run without any `node` command: `sh scripts/build-frontend.sh && sh scripts/check-frontend.sh`.
 
-Run the template by opening `templates/mini-app/index.html` in a browser. No dependencies or backend.
+Open `templates/mini-app/index.html` directly for the standalone example. No backend or network is needed.
 
-Copy that folder to `apps/<app-id>/` for a new app. Change the behavior, identity, visible Help, manifest and README. Validate the manifest using `python3 scripts/validate-mini-app.py apps/<app-id>`. Validation does **not** prove runtime, WebToApp import, or installed APK operation.
+To make a new app, copy the template into `apps/<app-id>/`, replace its actual functionality, identity and visible Help, and validate metadata with `python3 scripts/validate-mini-app.py apps/<app-id>`. This only checks metadata and file paths, not runtime or APK operation.
 
-The project does not automatically import, archive or delete anything from the ChatGPT Library.
+Nothing in this repository automatically imports, archives, or deletes ChatGPT Library files.

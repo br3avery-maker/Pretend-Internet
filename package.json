@@ -2,11 +2,9 @@
   "name": "pretend-internet",
   "private": true,
   "version": "0.1.0",
-  "description": "Static frontend launcher for Pretend Internet mini-apps",
-  "type": "module",
-  "engines": { "node": ">=18" },
+  "description": "Static WebToApp frontend with no JavaScript build-runtime dependency",
   "scripts": {
-    "build": "node scripts/build-frontend.mjs",
-    "check": "node scripts/check-frontend.mjs"
+    "build": "sh scripts/build-frontend.sh",
+    "check": "sh scripts/check-frontend.sh"
   }
 }
