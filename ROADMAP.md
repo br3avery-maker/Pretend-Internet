@@ -84,14 +84,14 @@ Turn Pretend Internet into a **small, verifiable home for independent mini-apps*
 
 ## What we are **not** doing yet
 
-- [ ] **No** bulk Library import, mass archive extraction, or multi-gigabyte generated indexes.
-- [ ] **No** replacing useful working interfaces with a shared design framework.
-- [ ] **No** mandatory backend, local server, token system, wallet or Nostr stack for unrelated apps.
-- [ ] **No** calling a browser preview a shipped Android app.
-- [ ] **No** moving archives or binaries into Git source just to empty Library.
-- [ ] **No** deleting Library originals without separate, informed approval.
+- **No** bulk Library import, mass archive extraction, or multi-gigabyte generated indexes.
+- **No** replacing useful working interfaces with a shared design framework.
+- **No** mandatory backend, local server, token system, wallet or Nostr stack for unrelated apps.
+- **No** calling a browser preview a shipped Android app.
+- **No** moving archives or binaries into Git source just to empty Library.
+- **No** deleting Library originals without separate, informed approval.
 
-The unchecked items in this last section are **prohibitions, not actionable tasks**; don't mark them done. The only immediate commitment from this document is to preserve and organize proposed work.
+These are guardrails, not checklist items. The roadmap records proposed work; it does not authorize bulk imports or deletion.
 
 ---
 
