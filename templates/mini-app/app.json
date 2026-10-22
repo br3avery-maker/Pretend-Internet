@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "0.1",
+  "id": "pocket-counter",
+  "name": "Pocket Counter",
+  "version": "0.1.0",
+  "status": "wip",
+  "summary": "An offline counting example with local storage, Help, and two skins.",
+  "entry": "index.html",
+  "offline": true,
+  "storage": "localStorage",
+  "permissions": [],
+  "help": {
+    "purpose": "Count up, down, or reset without a server.",
+    "start": "Press +1 or −1 to change the count.",
+    "limitations": "Demonstration only, not a verified Android release.",
+    "data": "Count and skin are stored in browser local storage when available."
+  }
+}
