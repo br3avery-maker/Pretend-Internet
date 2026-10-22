@@ -45,7 +45,7 @@ Turn Pretend Internet into a **small, verifiable home for independent mini-apps*
 
 ## Stage 3 — Controlled Library adoption, one project at a time
 
-- [ ] Create a **small candidate list** from existing Library files; do not ingest the entire Library or unpack huge archives by default.
+- [x] Create a **small candidate list** from existing Library files; see [Library app-shapes intake v0.1](docs/library-app-shapes-v0.1.md). Metadata scanned and representative sources inspected; no apps adopted or imported.
 - [ ] For each candidate, establish original **Library ID/path**, file size, SHA-256 hash when bytes are available, source provenance, license, state (working/broken/unknown), dependencies and unique assets.
 - [ ] Classify candidates: **adopt / broken / superseded / exact duplicate / unknown / unique historical / disposable**. Distinguish *physical file occurrence* from *logical project/version*.
 - [ ] Pick the first candidate based on **small footprint + standalone usefulness + low dependencies + recoverable source**, not nostalgia or size alone.
