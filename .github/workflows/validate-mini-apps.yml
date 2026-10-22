@@ -1,0 +1,17 @@
+name: Mini-app metadata check
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate template and apps
+        run: |
+          python3 scripts/validate-mini-app.py templates/mini-app
+          for f in apps/*/app.json; do
+            [ -f "$f" ] || continue
+            python3 scripts/validate-mini-app.py "$(dirname "$f")"
+          done
