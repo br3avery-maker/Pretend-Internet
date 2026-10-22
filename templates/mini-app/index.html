@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pocket Counter — mini-app template</title>
+<link rel="stylesheet" href="skin.css">
+</head>
+<body>
+<main>
+<header>
+  <div><h1>Pocket Counter</h1><p class="small muted">Offline example · WIP template</p></div>
+  <button type="button" id="helpToggle" aria-expanded="false" aria-controls="help">Help</button>
+</header>
+<section class="card" id="help" aria-labelledby="helpTitle" hidden>
+  <h2 id="helpTitle">What is this?</h2>
+  <p>A tiny counting app demonstrating mini-app Help and skins.</p>
+  <p><strong>Start:</strong> Use +1 and −1 to change the count; Reset returns it to zero.</p>
+  <p><strong>Status:</strong> Development example, not a verified Android release.</p>
+  <p><strong>Data:</strong> The count and skin stay in this browser's local storage when available. No network or device permission is required.</p>
+</section>
+<section class="card" aria-label="Counter">
+  <div id="count" class="number" role="status" aria-live="polite" aria-atomic="true">0</div>
+  <div class="controls">
+    <button id="minus" type="button" aria-label="Subtract one">−1</button>
+    <button id="plus" type="button" class="primary" aria-label="Add one">+1</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+  <p class="small muted" id="storageStatus" role="status"></p>
+</section>
+<section class="card">
+  <h2>Appearance</h2>
+  <p class="small muted">Changing a skin does not change app behavior.</p>
+  <button id="changeSkin" type="button">Switch skin</button>
+  <p class="small muted" id="skinLabel"></p>
+</section>
+</main>
+<script>
+(() => {
+  "use strict";
+  const key="pretend-internet:pocket-counter:v1";
+  const el=id=>document.getElementById(id);
+  let count=0, skin="punk", persistent=true;
+  try {
+    const data=JSON.parse(localStorage.getItem(key)||"{}");
+    if(Number.isSafeInteger(data.count)) count=data.count;
+    if(["punk","daylight"].includes(data.skin)) skin=data.skin;
+  } catch (_) {persistent=false;}
+  function draw(){
+    el("count").textContent=String(count);
+    document.documentElement.dataset.skin=skin;
+    el("skinLabel").textContent="Skin: "+(skin==="punk"?"Punk":"Daylight");
+    el("storageStatus").textContent=persistent?"Local storage enabled":"Temporary only — storage unavailable";
+  }
+  function save(){
+    if(!persistent)return;
+    try {localStorage.setItem(key,JSON.stringify({count,skin}));}
+    catch(_){persistent=false;draw();}
+  }
+  function change(next){
+    if(!Number.isSafeInteger(next)){el("storageStatus").textContent="Number limit reached";return;}
+    count=next;draw();save();
+  }
+  el("plus").addEventListener("click",()=>change(count+1));
+  el("minus").addEventListener("click",()=>change(count-1));
+  el("reset").addEventListener("click",()=>change(0));
+  el("changeSkin").addEventListener("click",()=>{skin=skin==="punk"?"daylight":"punk";draw();save();});
+  el("helpToggle").addEventListener("click",()=>{
+    const opened=el("help").hidden;
+    el("help").hidden=!opened;
+    el("helpToggle").setAttribute("aria-expanded",String(opened));
+  });
+  draw();
+})();
+</script>
+</body>
+</html>
