@@ -1,4 +1,4 @@
-name: Mini-app metadata check
+name: Mini-app metadata and frontend build
 on:
   push:
     branches: [main]
@@ -8,10 +8,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate template and apps
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Validate mini-app metadata
         run: |
           python3 scripts/validate-mini-app.py templates/mini-app
           for f in apps/*/app.json; do
             [ -f "$f" ] || continue
             python3 scripts/validate-mini-app.py "$(dirname "$f")"
           done
+      - name: Build frontend and check output
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm run check
