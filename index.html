@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#181017">
+  <title>Pretend Internet · Mini-App Workbench</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --app-bg: #181017;
+      --surface: #271d28;
+      --surface-2: #342532;
+      --text: #ffeaf3;
+      --muted: #d2b2c1;
+      --accent: #f0589c;
+      --border: #644355;
+      --focus: #ffcae1;
+      --radius: 18px;
+      --space: 8px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 280px; min-height: 100dvh; background: var(--app-bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+    main { max-width: 560px; margin: 0 auto; }
+    .eyebrow { font-size: .75rem; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 800; }
+    h1 { font-size: clamp(1.7rem, 8vw, 2.4rem); line-height: 1.15; margin: 10px 0 12px; }
+    h2 { font-size: 1.15rem; margin: 0; }
+    p { margin: 8px 0 0; }
+    .muted { color: var(--muted); }
+    .card, details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .status { display: inline-block; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; font-size: .8rem; }
+    a.open { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #180b15; font-weight: 750; text-decoration: none; min-height: 48px; border-radius: 12px; padding: 10px 20px; margin-top: 18px; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+    details { padding: 0; }
+    summary { min-height: 48px; padding: 16px 20px; cursor: pointer; font-weight: 700; }
+    details p { margin: 0 20px 20px; }
+    small { color: var(--muted); }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Pretend Internet / Development shelf</div>
+  <h1>Little apps. Their own rules. One tidy home.</h1>
+  <p class="muted">This is the development launcher, not a finished collection. Only the working example below is included in this first frontend build.</p>
+
+  <section class="card" aria-labelledby="example-title">
+    <div class="header">
+      <h2 id="example-title">Pocket Counter</h2>
+      <span class="status">Example · WIP</span>
+    </div>
+    <p class="muted">Count up or down, switch between two skins, and open in-app Help. It works offline and stores its count locally when browser storage is available.</p>
+    <a class="open" href="./templates/mini-app/index.html">Open example →</a>
+  </section>
+
+  <details>
+    <summary>What is this app?</summary>
+    <p>This is a small test of the Pretend Internet mini-app rules: every app should explain itself, work independently, and support different skins without changing its behavior. It does not connect to public networks or include unfinished Library projects. An installed Android APK has not yet been verified.</p>
+  </details>
+  <p style="margin-top:24px"><small>No account, server, or device permissions are required for this launcher.</small></p>
+</main>
+</body>
+</html>
