@@ -75,6 +75,24 @@ Turn Pretend Internet into a **small, verifiable home for independent mini-apps*
 - [ ] Maintain a **small app index** containing each app's purpose, current status, repository location, target, last verified build, and known problems; index metadata, **not duplicate code**.
 - [ ] Review the Library intake and retirement receipts after each real adoption. Measure fewer active redundant occurrences, not volume of files moved.
 
+## WebToApp checkpoint — observed UI (2026-10-21)
+
+- User reports the WebToApp frontend is working, and supplied screenshots showing the root development shelf and the opened Pocket Counter (count showing 3, controls and skin selector visible, local-storage availability message).
+- This supports **successful on-device rendering and interactive use in the WebToApp interface**. It does **not** yet establish an installed exported APK, save-and-reopen persistence, alternate-skin verification, or full release readiness. Keep those checks open.
+
+### Candidate shell navigation — mini-app drawer (suggested, not yet implemented)
+
+User suggestion: if the shell/mini-app launcher becomes a permanent part of the app, use a **drawer** instead of a whole launcher page.
+
+- [ ] Keep the active mini-app as the main screen; open a compact navigation drawer on demand.
+- [ ] Drawer shows app **name, short purpose, and honest status**; allow returning to the current app without resetting its state.
+- [ ] Provide a persistent, accessible way to open/close the drawer; respect Android Back and keyboard Escape where applicable.
+- [ ] Keep each mini-app independently runnable, with its **own Help**; the shared shell must not be a prerequisite for normal app operation.
+- [ ] Confirm WebToApp's existing multi-app navigation/toolbar capabilities before adding or duplicating custom controls.
+- [ ] Test navigation and state preservation with **at least two working apps** before treating a shell drawer as adopted architecture.
+
+**Scope:** exploration only. Do not refactor the currently working launcher/counter based on this note alone.
+
 ## Ideas to park (not approved implementation)
 
 - Br3Apps multi-app launcher with standardized in-app Help and Puter, only after package/runtime capabilities are validated.
