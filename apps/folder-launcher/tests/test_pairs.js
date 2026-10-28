@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const s=fs.readFileSync(__dirname+'/../web2app/index.html','utf8');
+const js=s.match(/<script>([\s\S]*?)<\/script>/)[1];
+const a=js.indexOf('function fmtName('),b=js.indexOf('function cleanupUrls(');
+const context=vm.createContext({extensions:['png','webp','jpg','jpeg','svg','gif','avif']});
+vm.runInContext(js.slice(a,b),context);
+const fake=['One.html','One.png','Two.htm','Two.webp','Orphan.html','Unrelated.svg'].map(name=>({name}));
+const result=vm.runInContext('indexPairs',context)(fake);
+assert.strictEqual(result.length,3);
+assert.deepStrictEqual(Array.from(result, x=>x.label),['One','Orphan','Two']);
+assert.strictEqual(result[0].icon.name,'One.png');
+console.log('PASS: matching stems, extension recognition, optional icon support and alphabetical order');
