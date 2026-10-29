@@ -12,4 +12,14 @@ for expr in ['ACTION_OPEN_DOCUMENT_TREE','takePersistableUriPermission','ZipInpu
     assert expr in java,expr
 assert 'READ_EXTERNAL_STORAGE' not in m.read_text().replace('<!-- No READ_EXTERNAL_STORAGE, MANAGE_EXTERNAL_STORAGE or runtime media grant. The system folder picker grants narrow persistent read access. -->','')
 assert (root/'web2app/index.html').read_bytes()==(root/'native/android-app/app/src/main/assets/index.html').read_bytes()
-print('PASS: manifest permissions, persistent SAF, ZIP streaming, distinct app storage origins, WebView file chooser, UI sync')
+# The browser fixture must represent the exact JavaScript shipped by both launchers.
+import re
+embedded_scripts=re.findall(r'<script>([\\s\\S]*?)</script>',(root/'web2app/index.html').read_text())
+assert len(embedded_scripts)==1, 'Expected one embedded launcher script'
+assert (root/'tests/launcher.js').read_text().strip()==embedded_scripts[0].strip(), 'Browser fixture drifted from shipped launcher'
+# The Android catalog emits id, which must survive mapping into the JS bridge.
+assert 'data.put("id",a.id)' in java, 'Native catalog must emit app id'
+assert 'entries=list.map(x=>({name:x.id,' in embedded_scripts[0], 'Native app id lost in JS mapping'
+assert 'window.AndroidLauncher.launchApp(app.name)' in embedded_scripts[0], 'JS must pass app id to native bridge'
+assert 'apps.get(id)' in java, 'Native bridge must resolve app id'
+print('PASS: manifest, SAF, ZIP, per-app origins, file chooser, UI sync, JS fixture and native ID bridge')
