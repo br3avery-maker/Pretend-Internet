@@ -58,6 +58,7 @@ function indexPairs(files){const map=new Map();for(const file of files){let n=fi
 return [...map.entries()].filter(([k,v])=>v.html).map(([k,v])=>({name:v.html.name,base:k,label:fmtName(v.html.name),html:v.html,icon:v.icon})).sort((a,b)=>a.label.localeCompare(b.label,undefined,{numeric:true}));}
 // ZIP directory reader for HTML-only Web2App wrappers. Reads compressed entries in memory;
 // native Android handles ZIPs directly and supports full relative resources and fetch().
+const ZIP_ENTRY_LIMIT=32*1024*1024;
 function safeZipPath(path){return path&&!path.startsWith('/')&&!path.includes('\\')&&!path.split('/').some(s=>!s||s==='.'||s==='..')}
 async function zipIndex(file){
  const data=await file.arrayBuffer(),view=new DataView(data),entries=new Map();
@@ -68,10 +69,10 @@ async function zipIndex(file){
  const decoder=new TextDecoder('utf-8');
  for(let i=0;i<count;i++){
   if(pos+46>data.byteLength||view.getUint32(pos,true)!==0x02014b50)throw Error('Invalid ZIP directory');
-  const method=view.getUint16(pos+10,true),size=view.getUint32(pos+20,true),length=view.getUint16(pos+28,true),extra=view.getUint16(pos+30,true),comment=view.getUint16(pos+32,true),offset=view.getUint32(pos+42,true);
+  const method=view.getUint16(pos+10,true),size=view.getUint32(pos+20,true),expanded=view.getUint32(pos+24,true),length=view.getUint16(pos+28,true),extra=view.getUint16(pos+30,true),comment=view.getUint16(pos+32,true),offset=view.getUint32(pos+42,true);
   if(pos+46+length+extra+comment>data.byteLength)throw Error('Truncated ZIP directory');
   const name=decoder.decode(new Uint8Array(data,pos+46,length));
-  if(safeZipPath(name)&&size<=32*1024*1024)entries.set(name,{name,method,size,offset});
+  if(safeZipPath(name)&&size<=ZIP_ENTRY_LIMIT&&expanded<=ZIP_ENTRY_LIMIT)entries.set(name,{name,method,size,offset});
   pos+=46+length+extra+comment;
  }
  return {buffer:data,view,entries};
@@ -88,7 +89,18 @@ async function zipRead(index,entry){
  if(end>buffer.byteLength)throw Error('Truncated ZIP data');
  const compressed=new Blob([buffer.slice(start,end)]);
  if(info.method===0)return new Blob([compressed],{type:zipMime(info.name)});
- if(info.method===8&&typeof DecompressionStream==='function')return new Blob([await new Response(compressed.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob()],{type:zipMime(info.name)});
+ if(info.method===8&&typeof DecompressionStream==='function'){
+  const reader=compressed.stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  const chunks=[];let total=0;
+  try{
+   while(true){const {done,value}=await reader.read();if(done)break;
+    total+=value.byteLength;
+    if(total>ZIP_ENTRY_LIMIT)throw Error('ZIP entry exceeds 32 MiB limit');
+    chunks.push(value);
+   }
+  }catch(error){await reader.cancel().catch(()=>{});throw error}
+  return new Blob(chunks,{type:zipMime(info.name)});
+ }
  throw Error('ZIP compression not supported by this WebView; use the native Android launcher');
 }
 async function buildCatalog(files){
