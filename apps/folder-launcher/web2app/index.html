@@ -62,7 +62,15 @@ const ZIP_ENTRY_LIMIT=32*1024*1024;
 function safeZipPath(path){return path&&!path.startsWith('/')&&!path.includes('\\')&&!path.split('/').some(s=>!s||s==='.'||s==='..')}
 async function zipIndex(file){
  const data=await file.arrayBuffer(),view=new DataView(data),entries=new Map();
- let eocd=-1;for(let i=data.byteLength-22;i>=Math.max(0,data.byteLength-65557);i--){if(view.getUint32(i,true)===0x06054b50){eocd=i;break}}
+ let eocd=-1;for(let i=data.byteLength-22;i>=Math.max(0,data.byteLength-65557);i--){
+  if(view.getUint32(i,true)!==0x06054b50)continue;
+  const commentLength=view.getUint16(i+20,true);
+  const disk=view.getUint16(i+4,true),centralDisk=view.getUint16(i+6,true);
+  const onDisk=view.getUint16(i+8,true),total=view.getUint16(i+10,true);
+  const dirSize=view.getUint32(i+12,true),dirOffset=view.getUint32(i+16,true);
+  if(i+22+commentLength!==data.byteLength||disk!==0||centralDisk!==0||onDisk!==total||dirOffset+dirSize!==i)continue;
+  eocd=i;break;
+ }
  if(eocd<0)throw Error('Not a supported ZIP file');
  let count=view.getUint16(eocd+10,true),pos=view.getUint32(eocd+16,true);
  if(count>4000||pos>=data.byteLength)throw Error('ZIP has too many entries or unsupported ZIP64 structure');
