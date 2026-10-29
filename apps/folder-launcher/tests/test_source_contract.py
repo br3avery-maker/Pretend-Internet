@@ -14,7 +14,7 @@ assert 'READ_EXTERNAL_STORAGE' not in m.read_text().replace('<!-- No READ_EXTERN
 assert (root/'web2app/index.html').read_bytes()==(root/'native/android-app/app/src/main/assets/index.html').read_bytes()
 # The browser fixture must represent the exact JavaScript shipped by both launchers.
 import re
-embedded_scripts=re.findall(r'<script>([\\s\\S]*?)</script>',(root/'web2app/index.html').read_text())
+embedded_scripts=re.findall(r'<script>(.*?)</script>',(root/'web2app/index.html').read_text(),re.S)
 assert len(embedded_scripts)==1, 'Expected one embedded launcher script'
 assert (root/'tests/launcher.js').read_text().strip()==embedded_scripts[0].strip(), 'Browser fixture drifted from shipped launcher'
 # The Android catalog emits id, which must survive mapping into the JS bridge.
