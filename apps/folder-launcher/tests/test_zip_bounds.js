@@ -17,7 +17,7 @@ const context = vm.createContext({
 });
 vm.runInContext(helpers, context);
 
-function makeZip(content, advertisedSize = content.length) {
+function makeZip(content, advertisedSize = content.length, comment = Buffer.alloc(0)) {
   const name = Buffer.from('index.html');
   const compressed = deflateRawSync(content);
   const local = Buffer.alloc(30);
@@ -38,7 +38,8 @@ function makeZip(content, advertisedSize = content.length) {
   eocd.writeUInt16LE(1, 10);
   eocd.writeUInt32LE(central.length + name.length, 12);
   eocd.writeUInt32LE(local.length + name.length + compressed.length, 16);
-  return new File([local, name, compressed, central, name, eocd], 'site.zip');
+  eocd.writeUInt16LE(comment.length, 20);
+  return new File([local, name, compressed, central, name, eocd, comment], 'site.zip');
 }
 
 test('normal deflated HTML stays readable', async () => {
@@ -57,4 +58,17 @@ test('forged small uncompressed size cannot bypass streaming expansion limit', a
   const zip = await context.zipIndex(makeZip(Buffer.alloc(32 * 1024 * 1024 + 1, 65), 1));
   assert.equal(zip.entries.has('index.html'), true);
   await assert.rejects(context.zipRead(zip, 'index.html'), /ZIP entry exceeds 32 MiB limit/);
+});
+
+test('ZIP comment containing EOCD signature does not hide valid index.html', async () => {
+  const comment = Buffer.alloc(22);
+  comment.writeUInt32LE(0x06054b50, 0);
+  const zip = await context.zipIndex(makeZip(Buffer.from('<h1>OK</h1>'), undefined, comment));
+  assert.equal(zip.entries.has('index.html'), true);
+});
+
+test('rejects EOCD with inconsistent central directory extent', async () => {
+  const raw = Buffer.from(await makeZip(Buffer.from('<h1>OK</h1>')).arrayBuffer());
+  raw.writeUInt32LE(0, raw.length - 22 + 12);
+  await assert.rejects(context.zipIndex(new File([raw], 'bad.zip')), /Not a supported ZIP file/);
 });
