@@ -44,7 +44,7 @@
 const NATIVE=!!(window.AndroidLauncher&&typeof window.AndroidLauncher.listApps==='function');
 const $=id=>document.getElementById(id);
 const extensions=['png','webp','jpg','jpeg','svg','gif','avif'];
-let folder=null,entries=[],objectUrls=[],active='',recheckLock=false;
+let folder=null,entries=[],objectUrls=[],activeUrls=[],active='',openToken=0,recheckLock=false;
 const dbName='folder-launcher-v1';
 function storage(){return new Promise((resolve,reject)=>{const req=indexedDB.open(dbName,1);req.onupgradeneeded=()=>{const d=req.result;d.createObjectStore('settings');d.createObjectStore('files')};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function dbGet(store,key){const d=await storage();return new Promise((res,rej)=>{const t=d.transaction(store,'readonly'),q=t.objectStore(store).get(key);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);t.oncomplete=()=>d.close()})}
@@ -179,9 +179,10 @@ async function makeHTML(app){
  }
  return {html:'<!doctype html>\n'+doc.documentElement.outerHTML,urls};
 }
-async function openApp(app){closeSettings();active=app.name;$('player').classList.add('active');$('gear').style.display='none';if(!location.hash.startsWith('#/app/'))history.pushState({app:app.name},'', '#/app/'+encodeURIComponent(app.name));if(app.native){window.AndroidLauncher.launchApp(app.name);$('player').classList.remove('active');return}
-try{const v=await makeHTML(app);v.urls.forEach(u=>objectUrls.push(u));$('appframe').srcdoc=v.html;}catch(err){status('Could not open app: '+err.message);returnHome(false)}}
-function returnHome(goBack=true){active='';$('player').classList.remove('active');$('appframe').removeAttribute('srcdoc');$('appframe').src='about:blank';$('gear').style.display='grid';if(goBack&&location.hash.startsWith('#/app/'))history.back()}
+function releaseActiveUrls(){activeUrls.forEach(u=>URL.revokeObjectURL(u));activeUrls=[]}
+async function openApp(app){closeSettings();const token=++openToken;releaseActiveUrls();active=app.name;$('player').classList.add('active');$('gear').style.display='none';if(!location.hash.startsWith('#/app/'))history.pushState({app:app.name},'', '#/app/'+encodeURIComponent(app.name));if(app.native){window.AndroidLauncher.launchApp(app.name);$('player').classList.remove('active');return}
+try{const v=await makeHTML(app);if(token!==openToken){v.urls.forEach(u=>URL.revokeObjectURL(u));return}activeUrls=v.urls;$('appframe').srcdoc=v.html;}catch(err){if(token===openToken){status('Could not open app: '+err.message);returnHome(false)}}}
+function returnHome(goBack=true){++openToken;releaseActiveUrls();active='';$('player').classList.remove('active');$('appframe').removeAttribute('srcdoc');$('appframe').src='about:blank';$('gear').style.display='grid';if(goBack&&location.hash.startsWith('#/app/'))history.back()}
 window.addEventListener('popstate',()=>{if(active)returnHome(false)});
 window.addEventListener('focus',()=>{if(!active)refresh()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!active)refresh()});
 window.onNativeCatalogChanged=()=>refresh();window.onNativeAppReturned=()=>{returnHome(true);refresh()};$('gear').onclick=openSettings;$('dismiss').onclick=closeSettings;$('shade').onclick=e=>{if(e.target===$('shade'))closeSettings()};$('scan').onclick=refresh;$('choose').onclick=chooseFolder;$('back').onclick=()=>returnHome();
