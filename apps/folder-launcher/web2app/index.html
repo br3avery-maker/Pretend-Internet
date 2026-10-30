@@ -178,7 +178,7 @@ async function makeHTML(app){
    blob=new Blob([css],{type:'text/css'});
   }
   if(ext(path)==='js'||ext(path)==='mjs')blob=new Blob([await blob.text()],{type:'text/javascript'});
-  const href=URL.createObjectURL(blob);urls.push(href);return href;
+  const href=URL.createObjectURL(blob);urls.push(href);const fragment=url.indexOf('#');return fragment<0?href:href+url.slice(fragment);
  }
  async function rewriteCSS(css,dir){
   const matcher=/url\(\s*(['"]?)([^)'"\s]+)\1\s*\)/gi;
