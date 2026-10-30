@@ -1,0 +1,1 @@
+{"name":"@pretend-internet/relay-router","version":"0.1.0","private":true,"type":"module","engines":{"node":">=22"},"scripts":{"test":"node --test test/*.test.mjs","demo":"node demo.mjs"},"dependencies":{"nostr-tools":"2.25.2"},"devDependencies":{"ws":"8.22.0"}}
