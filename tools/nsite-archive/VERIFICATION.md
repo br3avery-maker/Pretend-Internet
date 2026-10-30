@@ -27,3 +27,12 @@ Host: Linux, Node 24.22.1, Playwright 1.56.1 / Chromium 141.0.7390.37. Fresh tem
 - No end-user app integration, WebToApp APK export/install, live nsite publication, Crawlstr/SIP-01 publication, deployment, new account or recurring job was executed.
 - The static viewer is an archive directory, not a whole-corpus autonomous crawler running inside a phone webpage. The local worker needs a supported Node host; previews additionally require its OS sandbox.
 - Back up the stopped worker's entire archive home for full byte restoration. Exported viewer JSON/NDJSON preserves index and signed history but is not a second full content archive.
+
+
+## Follow-up to automated review 5714404504
+
+The [five findings](https://github.com/br3avery-maker/Pretend-Internet/pull/15#pullrequestreview-5714404504) were reproduced against merged base `77ddcaf`. All six initial reproduction tests failed: an eight-file same-second legacy publication exposed only three files; repeated-path indexing ignored its disk cap; the second relay never received its Blossom metadata query; three encoded preview resources were aborted; nested HTML exhausted the stack; and a per-file read failure stopped the indexing queue.
+
+The follow-up preserves reconstruction order for legacy ties, reserves SQLite/WAL capacity before extraction writes and pauses resumably, schedules unfinished metadata ahead of completed relays, normalizes preview URL paths and invalidates the prior renderer cache, and uses iterative bounded HTML walks with durable per-file failures and explicit retry. Existing signed events, native hashes and downloaded bytes remain unchanged.
+
+Local validation: **41 tests passed**, including seven review regressions, and the mobile/offline browser flow passed. The existing CI sandbox test now additionally requires a real Unicode/space-named HTML entry and all three archived image URL forms to be fulfilled. Current-head CI and automated re-review results belong in the follow-up PR record; successful local mocks are not substituted for that real browser gate.

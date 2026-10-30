@@ -5,8 +5,9 @@ import { mime, visualHTML } from './extract.mjs';
 
 export const PREVIEW_CSP =
   "default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox";
+export const PREVIEW_PROFILE = 'visual-v2';
 export async function screenshot(archive, snapshot, { chromium, timeout = 15000 } = {}) {
-  const key = sha(JSON.stringify([snapshot.aggregate, 'visual-v1', 390, 844]));
+  const key = sha(JSON.stringify([snapshot.aggregate, PREVIEW_PROFILE, 390, 844]));
   const cached = archive.one('SELECT * FROM previews WHERE key=?', key);
   if (cached?.status === 'complete') return { key, status: 'cached', hash: cached.hash };
   const main =
@@ -15,9 +16,19 @@ export async function screenshot(archive, snapshot, { chromium, timeout = 15000 
   if (!main) return { key, status: 'not-renderable' };
   if (snapshot.files.some((f) => !archive.one('SELECT hash FROM blobs WHERE hash=?', f.hash)))
     return { key, status: 'partial-archive' };
-  const files = new Map(snapshot.files.map((f) => [f.path, f]));
+  const requestPath = (value) =>
+    new URL(value, 'https://archive.invalid').pathname.replace(/%[0-9a-f]{2}/gi, (value) =>
+      value.toUpperCase(),
+    );
+  const files = new Map();
   let browser, timer;
   try {
+    for (const file of snapshot.files) {
+      const pathname = requestPath(file.path);
+      if (files.has(pathname) && files.get(pathname).hash !== file.hash)
+        throw Error('ambiguous-preview-path');
+      files.set(pathname, file);
+    }
     chromium ??= (await import('@playwright/test')).chromium;
     // Never fall back to --no-sandbox. Use a non-root host with OS sandbox
     // support. A missing sandbox is an explicit failed preview, not permission
@@ -46,7 +57,7 @@ export async function screenshot(archive, snapshot, { chromium, timeout = 15000 
           route.request().method() !== 'GET'
         )
           return route.abort();
-        const file = files.get(url.pathname);
+        const file = files.get(requestPath(url.href));
         if (!file) return route.abort();
         const type = mime(file.path);
         if (

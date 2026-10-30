@@ -30,7 +30,7 @@ The archive defaults to `~/.local/share/pretend-internet/nsite-archive`. Set `--
 1. Query complete manifests from configured bootstrap relays, discover author publication relays from signed NIP-65 lists, and find Blossom hints from manifests and signed BUD-03 server lists. Supports root **15128**, named **35128**, immutable **5128**, and legacy per-file **34128** events. Input URLs may resolve a particular root, namespace or snapshot.
 2. Preserve each original signed event and its discovery sources. Modern manifests become immutable path/hash snapshots. Legacy file events become **explicitly reconstructed** observed trees, retaining individual signatures and events. Signed malformed manifests remain quarantined with their errors.
 3. Queue **every referenced hash**. Reuse verified whole files before network transfer. Retrieve missing files from ordered hints, fall back after failures, hash-verify complete bytes, split them at Gear content-defined boundaries and store only unique chunks and Hashtree nodes. Temporary partial files resume through HTTP Range when supported.
-4. Extract HTML/text **after archival**. Cache per file hash/path/extractor version. Keep author metadata separate from derived titles/descriptions, headings, text, declared language, subject candidates, metadata and links.
+4. Extract HTML/text **after archival**. Cache per file hash/path/extractor version, pause before extraction records exceed the disk budget, and retain per-file failures without blocking later pages. Keep author metadata separate from derived titles/descriptions, headings, text, declared language, subject candidates, metadata and links.
 5. Attempt cached, sandboxed screenshots of complete revisions (set `previews: false` to opt out); missing browser/sandbox is reported without stopping text indexing.
 6. Produce a directory retaining all namespaces, identities, snapshots, partial failures and relationships. Nothing is pruned from ingest because a site has missing metadata, is prolific, is filtered, or resembles another site.
 
@@ -73,7 +73,7 @@ node cli.mjs restore SNAPSHOT_ID ./restored-site
 node cli.mjs verify
 ```
 
-Import accepts a JSON array or one signed event per line. No signature bypass. `diff` reports added/removed/changed paths and byte reuse from identical chunks. Restore verifies native whole-file hashes before creating a **new** directory; it refuses existing destinations. Restored site code remains ordinary untrusted site code; the tool does not execute it. For a complete portable archive, stop the worker and copy its entire home directory (database, objects, previews and staging); the static export contains the searchable index and signed events, **not all site bytes**.
+Import accepts a JSON array or one signed event per line. No signature bypass. `index` resumes after a storage-budget pause; `index --retry` (or `sync --retry`) explicitly retries recorded extraction failures. HTML traversal is iterative and capped at 100,000 visited nodes per traversal; a page exceeding the limit remains archived with an `html-node-limit` failure. `diff` reports added/removed/changed paths and byte reuse from identical chunks. Restore verifies native whole-file hashes before creating a **new** directory; it refuses existing destinations. Restored site code remains ordinary untrusted site code; the tool does not execute it. For a complete portable archive, stop the worker and copy its entire home directory (database, objects, previews and staging); the static export contains the searchable index and signed events, **not all site bytes**.
 
 ### Screenshots
 
@@ -85,7 +85,7 @@ node cli.mjs export ./collection-with-previews
 
 Requires Playwright's browser and a **non-root host supporting Chromium's OS sandbox**. The worker never disables that sandbox. Each preview uses a fresh context with JavaScript disabled, service workers blocked, no permissions/credentials/signer, downloads disabled, strict CSP, sanitized HTML, archived-only request fulfillment, 128-request/32-MiB/15-second limits and a fixed 390×844 viewport. Missing assets, browser, or sandbox produce explicit unavailable/failed previews. CSS, raster images and fonts can load only from the same archived revision. Dynamic-only apps may therefore have little useful visible content; they are still archived, and source text extraction remains separate. Preview SVG resources are refused.
 
-Screenshots are cached by aggregate hash plus renderer profile and dimensions, across authors. They represent the **safe static rendering**, not proof that a site's scripts function. The archive worker does not ask your everyday signed-in browser to execute archived applications.
+Screenshots are cached by aggregate hash plus renderer profile and dimensions, across authors. Renderer `visual-v2` normalizes Unicode/space URL paths; previous preview bytes remain preserved but are not reused by the new renderer. They represent the **safe static rendering**, not proof that a site's scripts function. The archive worker does not ask your everyday signed-in browser to execute archived applications.
 
 ### Filtering and relationships
 
@@ -115,7 +115,7 @@ Exact equality groups use the native NIP-5A aggregate. Declared parent/origin li
 - `objects/<prefix>/<sha256>`: unique plaintext chunks and canonical Hashtree MessagePack nodes. Native file hash → ordered chunk descriptor; no second full-file copy after ingest.
 - `staging/`: resumable public transfer fragments; not counted as verified files.
 - `previews/`: sanitized PNG previews, separate from native site assets.
-- `directory.json`: versioned **`nsite-archive.v1`** portable index, with `sites`, `publishers`, `groups`, `stats`, `discovery`, `rules`, and `unindexed` records. Per-page evidence includes native file hash and extractor. Per-version files include native hashes, availability, internal roots and ordered chunk descriptors.
+- `directory.json`: versioned **`nsite-archive.v1`** portable index, with `sites`, `publishers`, `groups`, `stats`, `discovery`, `rules`, and `unindexed` records. The optional `indexing` object reports pending pages and per-file extraction failures. Per-page evidence includes native file hash and extractor. Per-version files include native hashes, availability, internal roots and ordered chunk descriptors.
 - `events.ndjson`: original protocol fields, IDs and signatures, with no rewritten manifestations. Importable back into this worker or another verifier.
 
 Other clients can consume JSON/NDJSON without adopting this runtime. Crawlstr/SIP-01 publication is **not** inferred from an archive observation; a protocol-specific adapter would need its own explicit publication operation. No automatic adapter publishing, gateway rewriting, or existing-directory redesign is included.

@@ -5,6 +5,7 @@ import { signedEvent, hex64 } from '../relay-router/validation.mjs';
 import { chunks, merkleFile, merkleDirectory, PROFILE } from './chunks.mjs';
 import { parseManifest, tags, first, sha, aggregate, gatewayURL, safePath } from './manifest.mjs';
 import { extractHTML, EXTRACTOR, mime } from './extract.mjs';
+import { PREVIEW_PROFILE } from './preview.mjs';
 
 export const SCHEMA = 'nsite-archive.v1';
 const json = JSON.stringify;
@@ -44,6 +45,7 @@ export class Archive {
       CREATE TABLE IF NOT EXISTS objects(hash TEXT PRIMARY KEY,size INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS blobs(hash TEXT PRIMARY KEY,size INTEGER,root TEXT,parts TEXT,mime TEXT);
       CREATE TABLE IF NOT EXISTS pages(hash TEXT,path TEXT,version TEXT,data TEXT,PRIMARY KEY(hash,path,version));
+      CREATE TABLE IF NOT EXISTS index_failures(hash TEXT,path TEXT,version TEXT,error TEXT,PRIMARY KEY(hash,path,version));
       CREATE TABLE IF NOT EXISTS scans(relay TEXT,filter TEXT,cursor INTEGER,status TEXT,gaps TEXT NOT NULL DEFAULT '[]',PRIMARY KEY(relay,filter));
       CREATE TABLE IF NOT EXISTS previews(key TEXT PRIMARY KEY,hash TEXT,size INTEGER,status TEXT,error TEXT);
       CREATE TABLE IF NOT EXISTS rules(id TEXT PRIMARY KEY,rule TEXT NOT NULL);
@@ -238,6 +240,7 @@ export class Archive {
     // Legacy file events reconstruct observed trees by time; synthetic trees are
     // explicitly marked and never masquerade as a signed modern manifest.
     const legacy = new Map();
+    let reconstructionOrder = 0;
     for (const row of this.all(
       'SELECT * FROM events WHERE kind=34128 AND manifest IS NOT NULL ORDER BY created ASC,id DESC',
     )) {
@@ -259,13 +262,38 @@ export class Archive {
         relations: [],
         eventIds,
         legacy: true,
+        reconstructionOrder: ++reconstructionOrder,
       });
     }
-    return result.sort((a, b) => b.created - a.created || a.id.localeCompare(b.id));
+    return result.sort((a, b) => {
+      const time = b.created - a.created;
+      if (time) return time;
+      if (a.legacy !== b.legacy) return a.legacy ? 1 : -1;
+      // Synthetic IDs identify a tree; their lexical order says nothing about
+      // which tree includes the final same-second update. Signed modern events
+      // still use the NIP-01 lower-ID tie break.
+      return a.legacy ? b.reconstructionOrder - a.reconstructionOrder : a.id.localeCompare(b.id);
+    });
   }
-  index() {
-    let extracted = 0,
-      reused = 0;
+  index({ retry = false } = {}) {
+    const report = {
+      extracted: 0,
+      reused: 0,
+      failed: 0,
+      skipped: 0,
+      paused: false,
+      reason: null,
+      errors: [],
+    };
+    const pageSize = this.one('PRAGMA page_size').page_size;
+    const fits = (bytes) => {
+      // Reserve both database and WAL pages, plus B-tree/index bookkeeping.
+      const reserve = Math.ceil(bytes / pageSize) * pageSize * 2 + pageSize * 8;
+      if (this.diskBytes() + reserve <= this.maxStorageBytes) return true;
+      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      return this.diskBytes() + reserve <= this.maxStorageBytes;
+    };
+    const paused = () => Object.assign(report, { paused: true, reason: 'storage-budget' });
     for (const snapshot of this.snapshots())
       for (const file of snapshot.files) {
         if (
@@ -281,33 +309,73 @@ export class Archive {
             EXTRACTOR,
           )
         ) {
-          reused++;
+          report.reused++;
           continue;
         }
-        const bytes = this.read(file.hash);
-        const data =
-          mime(file.path) === 'text/html'
-            ? extractHTML(bytes, file.path)
-            : {
-                title: '',
-                description: '',
-                headings: [],
-                text: bytes.toString('utf8').slice(0, 1048576),
-                metadata: {},
-                links: [],
-                language: null,
-                subjects: [],
-              };
+        if (
+          !retry &&
+          this.one(
+            'SELECT hash FROM index_failures WHERE hash=? AND path=? AND version=?',
+            file.hash,
+            file.path,
+            EXTRACTOR,
+          )
+        ) {
+          report.skipped++;
+          continue;
+        }
+        if (!fits(0)) return paused();
+        let data;
+        try {
+          const bytes = this.read(file.hash);
+          data =
+            mime(file.path) === 'text/html'
+              ? extractHTML(bytes, file.path)
+              : {
+                  title: '',
+                  description: '',
+                  headings: [],
+                  text: bytes.toString('utf8').slice(0, 1048576),
+                  metadata: {},
+                  links: [],
+                  language: null,
+                  subjects: [],
+                };
+        } catch (error) {
+          const code = /^[A-Za-z0-9_-]{1,64}$/.test(error.code ?? error.message)
+            ? (error.code ?? error.message)
+            : 'extraction-failed';
+          if (!fits(Buffer.byteLength(file.path) + 256)) return paused();
+          this.run(
+            'INSERT OR REPLACE INTO index_failures VALUES (?,?,?,?)',
+            file.hash,
+            file.path,
+            EXTRACTOR,
+            code,
+          );
+          report.failed++;
+          report.errors.push({ hash: file.hash, path: file.path, code });
+          continue;
+        }
+        const serialized = json(data);
+        if (!fits(Buffer.byteLength(serialized) + Buffer.byteLength(file.path) + 256))
+          return paused();
         this.run(
           'INSERT OR REPLACE INTO pages VALUES (?,?,?,?)',
           file.hash,
           file.path,
           EXTRACTOR,
-          json(data),
+          serialized,
         );
-        extracted++;
+        this.run(
+          'DELETE FROM index_failures WHERE hash=? AND path=? AND version=?',
+          file.hash,
+          file.path,
+          EXTRACTOR,
+        );
+        report.extracted++;
       }
-    return { extracted, reused };
+    return report;
   }
   diff(beforeId, afterId) {
     const all = this.snapshots(),
@@ -453,7 +521,7 @@ export class Archive {
           } catch (e) {
             if (e.message !== 'storage-budget' && e.message !== 'file-directory-conflict') throw e;
           }
-        const previewKey = sha(json([v.aggregate, 'visual-v1', 390, 844]));
+        const previewKey = sha(json([v.aggregate, PREVIEW_PROFILE, 390, 844]));
         const preview = this.one('SELECT * FROM previews WHERE key=?', previewKey);
         return {
           id: v.id,
@@ -585,6 +653,28 @@ export class Archive {
       lineageVerified: false,
     }));
     const jobs = this.all('SELECT state,count(*) count FROM jobs GROUP BY state');
+    const indexFailures = this.all(
+      'SELECT hash,path,error FROM index_failures WHERE version=?',
+      EXTRACTOR,
+    );
+    const indexed = new Set(
+      this.all('SELECT hash,path FROM pages WHERE version=?', EXTRACTOR).map((r) =>
+        json([r.hash, r.path]),
+      ),
+    );
+    const failed = new Set(indexFailures.map((r) => json([r.hash, r.path]))),
+      indexPending = new Set();
+    for (const snapshot of snapshots)
+      for (const file of snapshot.files) {
+        const key = json([file.hash, file.path]);
+        if (
+          ['text/html', 'text/plain'].includes(mime(file.path)) &&
+          !indexed.has(key) &&
+          !failed.has(key) &&
+          this.one('SELECT hash FROM blobs WHERE hash=?', file.hash)
+        )
+          indexPending.add(key);
+      }
     return {
       schema: SCHEMA,
       generatedAt: Math.floor(Date.now() / 1000),
@@ -609,6 +699,7 @@ export class Archive {
         gaps: parse(r.gaps),
       })),
       similarityLimited,
+      indexing: { extractor: EXTRACTOR, pending: indexPending.size, failures: indexFailures },
       unindexed: this.all(
         'SELECT id,kind,error FROM events WHERE manifest IS NULL AND kind NOT IN (10063,10002)',
       ),
