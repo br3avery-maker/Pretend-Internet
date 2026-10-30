@@ -99,3 +99,32 @@ test('ordinary stylesheet imports still resolve into Blob URLs', async () => {
   assert.match(h.emitted[1], /blob:fixture-1/);
   assert.doesNotMatch(h.emitted[1], /data:text\/css,/);
 });
+
+test('string-form @import rewrites a local stylesheet and preserves media queries', async () => {
+  const h = harness({
+    'index.html': '<html/>',
+    'a.css': '@import "theme.css" screen and (min-width: 400px);',
+    'theme.css': 'body { color: red; }'
+  });
+  await h.run();
+  assert.deepEqual(h.reads, ['index.html', 'a.css', 'theme.css']);
+  assert.match(h.emitted[1], /@import "blob:fixture-1" screen and \(min-width: 400px\);/);
+});
+
+test('single-quoted string imports resolve relative to the importing stylesheet', async () => {
+  const h = harness({
+    'index.html': '<html/>',
+    'a.css': "@import 'nested/theme.css' print;",
+    'nested/theme.css': 'body { color: blue; }'
+  });
+  await h.run();
+  assert.deepEqual(h.reads, ['index.html', 'a.css', 'nested/theme.css']);
+  assert.match(h.emitted[1], /@import "blob:fixture-1" print;/);
+});
+
+test('string-form CSS self-import terminates without repeatedly reading the ZIP', async () => {
+  const h = harness({ 'index.html': '<html/>', 'a.css': '@import "a.css";' });
+  await h.run();
+  assert.deepEqual(h.reads, ['index.html', 'a.css']);
+  assert.match(h.emitted[0], /@import "data:text\/css,";/);
+});
