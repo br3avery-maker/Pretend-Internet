@@ -191,6 +191,12 @@ async function makeHTML(app){
   const matcher=/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi;
   const matches=[...css.matchAll(matcher)];
   for(const m of matches){const converted=await convert(m[1]??m[2]??m[3],dir);css=css.replace(m[0],'url('+JSON.stringify(converted)+')')}
+  // CSS supports string-form @import in addition to @import url(...).
+  const importMatcher=/(@import\s+)(["'])([^"'\r\n]+)\2/gi;
+  for(const m of [...css.matchAll(importMatcher)]){
+   const converted=await convert(m[3],dir);
+   css=css.replace(m[0],m[1]+JSON.stringify(converted));
+  }
   return css;
  }
  for(const elem of doc.querySelectorAll('[src],[href],[poster]')){
