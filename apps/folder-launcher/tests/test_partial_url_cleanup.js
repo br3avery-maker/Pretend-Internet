@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const html = fs.readFileSync(path.join(__dirname, '../web2app/index.html'), 'utf8');
-const script = html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+const script = html.split('<script>')[1]?.split('</script>')[0];
 assert.ok(script, 'Shipped launcher script exists');
 const begin = script.indexOf('async function makeHTML(app){');
 const end = script.indexOf('function releaseActiveUrls(', begin);
