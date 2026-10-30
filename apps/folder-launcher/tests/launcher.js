@@ -147,7 +147,7 @@ async function makeHTML(app){
 }
 function releaseActiveUrls(){activeUrls.forEach(u=>URL.revokeObjectURL(u));activeUrls=[]}
 async function openApp(app){closeSettings();const token=++openToken;releaseActiveUrls();active=app.name;$('player').classList.add('active');$('gear').style.display='none';if(!location.hash.startsWith('#/app/'))history.pushState({app:app.name},'', '#/app/'+encodeURIComponent(app.name));if(app.native){window.AndroidLauncher.launchApp(app.name);$('player').classList.remove('active');return}
-try{const v=await makeHTML(app);if(token!==openToken){v.urls.forEach(u=>URL.revokeObjectURL(u));return}activeUrls=v.urls;$('appframe').srcdoc=v.html;}catch(err){if(token===openToken){status('Could not open app: '+err.message);returnHome(false)}}}
+try{const v=await makeHTML(app);if(token!==openToken){v.urls.forEach(u=>URL.revokeObjectURL(u));return}activeUrls=v.urls;$('appframe').srcdoc=v.html;}catch(err){if(token===openToken){status('Could not open app: '+err.message);returnHome(true)}}}
 function returnHome(goBack=true){++openToken;releaseActiveUrls();active='';$('player').classList.remove('active');$('appframe').removeAttribute('srcdoc');$('appframe').src='about:blank';$('gear').style.display='grid';if(goBack&&location.hash.startsWith('#/app/'))history.back()}
 window.addEventListener('popstate',()=>{if(active)returnHome(false)});
 window.addEventListener('focus',()=>{if(!active)refresh()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!active)refresh()});

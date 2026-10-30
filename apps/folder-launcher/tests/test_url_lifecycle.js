@@ -13,8 +13,10 @@ const end = source.indexOf("window.addEventListener('popstate'", begin);
 assert.ok(begin >= 0 && end > begin, 'Expected original launcher open/return functions');
 const fragment = source.slice(begin, end);
 
-function harness(makeHTML) {
+function harness(makeHTML, initialHash = '#/app/test') {
   const revoked = [];
+  const route = {hash: initialHash};
+  const historyCalls = {pushes: [], backs: 0};
   const frame = {srcdoc: '', src: '', removeAttribute(name) { delete this[name]; }};
   const nodes = {
     player: {classList: {add() {}, remove() {}}},
@@ -28,15 +30,15 @@ function harness(makeHTML) {
     $: id => nodes[id],
     status() {},
     window: {AndroidLauncher: {launchApp() {}}},
-    history: {pushState() {}, back() {}},
-    location: {hash: '#/app/test'},
+    history: {pushState(_state, _title, url) {historyCalls.pushes.push(url); route.hash = url;}, back() {historyCalls.backs++; route.hash = ''; }},
+    location: route,
     objectUrls: ['blob:icon'],
     activeUrls: [],
     active: '',
     openToken: 0,
   });
   vm.runInContext(fragment, context);
-  return {context, revoked, frame};
+  return {context, revoked, frame, route, historyCalls};
 }
 
 test('Back releases app resources but retains launcher icon URLs', async () => {
@@ -82,4 +84,14 @@ test('late completion of prior app cannot overwrite a newer app', async () => {
   assert.deepEqual(h.revoked, ['blob:old']);
   h.context.returnHome(false);
   assert.deepEqual(h.revoked, ['blob:old', 'blob:new']);
+});
+
+// A failed ZIP/HTML open must not leave #/app/... in history and break Android Back.
+test('failed app preparation returns through browser history', async () => {
+  const h = harness(async () => { throw Error('invalid HTML'); }, '');
+  await h.context.openApp({name: 'broken'});
+  assert.deepEqual(h.historyCalls.pushes, ['#/app/broken']);
+  assert.equal(h.historyCalls.backs, 1);
+  assert.equal(h.route.hash, '');
+  assert.equal(h.context.active, '');
 });
