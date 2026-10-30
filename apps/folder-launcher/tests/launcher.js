@@ -108,6 +108,12 @@ async function storeFiles(files){if(!files.length)return;let count=0;for(const f
 // A single-file HTML app works untouched. Relative links to sibling files are rewritten
 // to object URLs for images, scripts and styles when those files are in the selected folder.
 async function fileList(){if(activeSource==='folder'&&folder&&await getPermission(folder)){const out=[];for await(const [,handle] of folder.entries())if(handle.kind==='file')out.push(await handle.getFile());return out}return (await dbAll()).map(x=>x.file)}
+function localResourcePath(url,dir){
+ try{
+  const path=decodeURIComponent(new URL(url.split(/[?#]/)[0],'https://local.invalid/'+dir).pathname.slice(1));
+  return safeZipPath(path)?path:null;
+ }catch{return null}
+}
 async function makeHTML(app){
  const index=app.zip?app.index:null;
  const raw=app.zip?await (await zipRead(index,app.entry)).text():await app.html.text();
@@ -117,9 +123,8 @@ async function makeHTML(app){
  const urls=[],base=app.zip?(app.entry.includes('/')?app.entry.slice(0,app.entry.lastIndexOf('/')+1):''):'';
  async function convert(url,dir=base){
   if(!url||/^(#|data:|blob:|https?:|mailto:|tel:|\/\/)/i.test(url)||url.startsWith('/'))return url;
-  let u;try{u=decodeURIComponent(url.split(/[?#]/)[0])}catch{return url}
-  let path;try{path=new URL(u,'https://local.invalid/'+dir).pathname.slice(1)}catch{return url}
-  if(!safeZipPath(path))return url;
+  const path=localResourcePath(url,dir);
+  if(!path)return url;
   let blob;
   if(index&&index.entries.has(path))blob=await zipRead(index,path);
   else if(!index&&byName.has(path.toLocaleLowerCase()))blob=byName.get(path.toLocaleLowerCase());
