@@ -6,14 +6,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '../web2app/index.html'), 'utf8');
-const script = html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 assert.ok(script, 'Shipped launcher script exists');
-const safePath = script.match(/function safeZipPath\\(path\\)\\{[^\\n]+\\}/)?.[0];
+const safePath = script.match(/function safeZipPath\(path\)\{[^\n]+\}/)?.[0];
 const start = script.indexOf('function localResourcePath(');
 const end = script.indexOf('async function makeHTML(');
 assert.ok(safePath && start >= 0 && end > start, 'Source path resolver exists');
 const context = vm.createContext({ URL });
-vm.runInContext(safePath + '\\n' + script.slice(start, end), context);
+vm.runInContext(safePath + '\n' + script.slice(start, end), context);
 const resolve = (url, dir = '') => vm.runInContext(
   'localResourcePath(' + JSON.stringify(url) + ',' + JSON.stringify(dir) + ')',
   context
