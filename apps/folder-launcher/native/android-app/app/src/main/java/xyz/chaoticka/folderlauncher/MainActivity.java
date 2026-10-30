@@ -169,7 +169,7 @@ public final class MainActivity extends Activity {
         return w;
     }
 
-    static WebResourceResponse notFound(){return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));}
+    static WebResourceResponse notFound(){return new WebResourceResponse("text/plain","UTF-8",404,"Not Found",java.util.Collections.emptyMap(),new ByteArrayInputStream(new byte[0]));}
     static String ext(String value){int i=value.lastIndexOf('.');return i<0?"":value.substring(i+1).toLowerCase(Locale.ROOT);}
     static String stem(String value){int i=value.lastIndexOf('.');return (i<0?value:value.substring(0,i)).toLowerCase(Locale.ROOT);}
     static String label(String value){int i=value.lastIndexOf('.');return (i<0?value:value.substring(0,i)).replace('_',' ').replace('-',' ');}
