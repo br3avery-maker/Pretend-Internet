@@ -4,7 +4,7 @@ from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parent.parent/'web2app'
 s=root.joinpath('index.html').read_text()
 js=s.split('<script>')[1].split('</script>')[0]
-helpers="const extensions=['png','webp','jpg','jpeg','svg','gif','avif']; const objectUrls=[];\n"+js[js.index('function fmtName('):js.index('function cleanupUrls(')]+'\n'+js[js.index('async function makeHTML('):js.index('async function openApp(')]
+helpers="const extensions=['png','webp','jpg','jpeg','svg','gif','avif']; const objectUrls=[];\n"+js[js.index('function fmtName('):js.index('function cleanupUrls(')]+'\n'+js[js.index('function localResourcePath('):js.index('async function openApp(')]
 def make_zip():
     buf=io.BytesIO()
     with zipfile.ZipFile(buf,'w',compression=zipfile.ZIP_DEFLATED) as z:
