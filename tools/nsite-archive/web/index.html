@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Nsite Archive</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="#">Nsite <span>Archive</span></a>
+      <details class="help">
+        <summary>Help</summary>
+        <p>
+          Search the text inside archived sites, including sites without a published title. Open a
+          site to browse its pages, signed publications, versions and relationships.
+        </p>
+        <p>
+          Import a <code>directory.json</code> export to begin. Everything you import stays in this
+          browser. Collecting sites and capturing safe previews happens in the local archive worker;
+          this viewer makes no relay or signer connections.
+        </p>
+        <p>
+          Filters only hide results. “Show filtered” reveals them; no archived files are removed.
+          Exact content is verified by hashes. Declared relationships are publishers’ claims;
+          probable clones are unverified similarities.
+        </p>
+        <p>
+          For a self-contained offline collection, keep this folder and its previews together. The
+          worker’s SQLite database and objects folder hold the restorable original bytes.
+        </p>
+      </details>
+    </header>
+    <main>
+      <section id="directory">
+        <div class="intro">
+          <div>
+            <h1>Collection</h1>
+            <p id="counts">Search what’s inside.</p>
+          </div>
+          <label class="button"
+            >Import<input id="import" type="file" accept=".json,application/json"
+          /></label>
+        </div>
+        <p id="message" role="status" aria-live="polite">Loading collection…</p>
+        <label class="search"
+          ><span class="sr">Search sites and page text</span
+          ><input
+            id="search"
+            type="search"
+            placeholder="Search sites, page text, publishers…"
+            autocomplete="off"
+        /></label>
+        <nav aria-label="Directory views">
+          <button data-view="sites" aria-pressed="true">Sites</button
+          ><button data-view="publishers" aria-pressed="false">Publishers</button
+          ><button data-view="related" aria-pressed="false">Related</button>
+        </nav>
+        <details id="tools">
+          <summary>Sort &amp; filters</summary>
+          <div class="controls">
+            <label
+              >Sort
+              <select id="sort">
+                <option value="updated">Last updated</option>
+                <option value="title">Title</option>
+                <option value="publisher">Author site count</option>
+                <option value="pages">Indexed pages</option>
+              </select></label
+            ><label><input id="filtered" type="checkbox" /> Show filtered</label
+            ><button id="export" disabled>Export index</button>
+          </div>
+        </details>
+        <p id="result-count" class="muted" aria-live="polite"></p>
+        <div id="results"></div>
+        <button id="more" hidden>Show more</button>
+      </section>
+      <section id="detail" hidden aria-label="Site details"></section>
+    </main>
+    <footer>
+      Local collection · Original publications preserved · <span id="stamp">No index loaded</span>
+    </footer>
+  </body>
+</html>

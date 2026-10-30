@@ -35,3 +35,7 @@ Open `templates/mini-app/index.html` directly for the standalone example. No bac
 To make a new app, copy the template into `apps/<app-id>/`, replace its actual functionality, identity and visible Help, and validate metadata with `python3 scripts/validate-mini-app.py apps/<app-id>`. This only checks metadata and file paths, not runtime or APK operation.
 
 Nothing in this repository automatically imports, archives, or deletes ChatGPT Library files.
+
+## Local nsite archive and content search
+
+[Nsite Archive](tools/nsite-archive/) is an independent local worker and portable static directory for issue #14: relay discovery, complete bounded asset collection, native hash verification, shared CDC chunks/Hashtree nodes, signed version history, actual page-text search, safe screenshot capture, publisher counts and reversible filtering. It reuses the existing [relay router](tools/relay-router/) read transport. It is not part of the launcher/APK build and starts no public crawler, publisher or recurring job. See its [run instructions](tools/nsite-archive/README.md) and [verification evidence](tools/nsite-archive/VERIFICATION.md).
