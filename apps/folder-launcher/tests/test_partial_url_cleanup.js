@@ -65,7 +65,7 @@ function harness(failOn) {
 test('failed preparation revokes every previously created resource URL', async () => {
   const h = harness('two.png');
   await assert.rejects(h.run(), /corrupt ZIP member/);
-  assert.deepEqual(h.reads, ['one.png', 'two.png']);
+  assert.deepEqual(h.reads, ['index.html', 'one.png', 'two.png']);
   assert.deepEqual(h.created, ['blob:fixture-1']);
   assert.deepEqual(h.revoked, h.created);
 });
