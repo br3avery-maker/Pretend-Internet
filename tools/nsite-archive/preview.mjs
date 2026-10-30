@@ -81,7 +81,9 @@ export async function screenshot(archive, snapshot, { chromium, timeout = 15000 
           status: 200,
           body,
           headers: {
-            'content-type': type,
+            // Sanitization decodes and re-encodes HTML as UTF-8 and strips meta
+            // elements, so the response must declare that encoding explicitly.
+            'content-type': type === 'text/html' ? 'text/html; charset=utf-8' : type,
             'content-security-policy': PREVIEW_CSP,
             'x-content-type-options': 'nosniff',
           },
