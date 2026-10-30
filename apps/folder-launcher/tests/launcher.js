@@ -120,20 +120,25 @@ async function makeHTML(app){
  const files=app.zip?[]:await fileList();
  const byName=new Map(files.map(f=>[f.name.toLocaleLowerCase(),f]));
  const doc=new DOMParser().parseFromString(raw,'text/html');
- const urls=[],base=app.zip?(app.entry.includes('/')?app.entry.slice(0,app.entry.lastIndexOf('/')+1):''):'';
+ const urls=[],activeCSS=new Set(),base=app.zip?(app.entry.includes('/')?app.entry.slice(0,app.entry.lastIndexOf('/')+1):''):'';
  async function convert(url,dir=base){
   if(!url||/^(#|data:|blob:|https?:|mailto:|tel:|\/\/)/i.test(url)||url.startsWith('/'))return url;
   const path=localResourcePath(url,dir);
   if(!path)return url;
+  // Browser CSS loaders ignore cycles; avoid recursively expanding them in ZIP previews.
+  if(ext(path)==='css'&&activeCSS.has(path))return 'data:text/css,';
   let blob;
   if(index&&index.entries.has(path))blob=await zipRead(index,path);
   else if(!index&&byName.has(path.toLocaleLowerCase()))blob=byName.get(path.toLocaleLowerCase());
   if(!blob)return url;
   // CSS needs its own relative resource URLs rewritten before wrapping in a Blob.
   if(ext(path)==='css'){
+   activeCSS.add(path);
+   try{
    let css=await blob.text(),cssdir=path.includes('/')?path.slice(0,path.lastIndexOf('/')+1):'';
    css=await rewriteCSS(css,cssdir);
    blob=new Blob([css],{type:'text/css'});
+   }finally{activeCSS.delete(path)}
   }
   if(ext(path)==='js'||ext(path)==='mjs')blob=new Blob([await blob.text()],{type:'text/javascript'});
   const href=URL.createObjectURL(blob);urls.push(href);const fragment=url.indexOf('#');return fragment<0?href:href+url.slice(fragment);
