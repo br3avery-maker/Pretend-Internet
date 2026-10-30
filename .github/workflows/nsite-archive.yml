@@ -1,0 +1,35 @@
+name: Nsite archive
+on:
+  push:
+    branches: [main]
+    paths:
+      ['tools/nsite-archive/**', 'tools/relay-router/**', '.github/workflows/nsite-archive.yml']
+  pull_request:
+    paths:
+      ['tools/nsite-archive/**', 'tools/relay-router/**', '.github/workflows/nsite-archive.yml']
+jobs:
+  archive:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            tools/nsite-archive/package-lock.json
+            tools/relay-router/package-lock.json
+      - name: Install pinned read-side router and archive dependencies
+        run: |
+          npm ci --prefix tools/relay-router --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tools/nsite-archive --ignore-scripts --no-audit --no-fund
+      - name: Verify archive, resumption, provenance, hashes and network boundaries
+        run: npm test --prefix tools/nsite-archive
+      - name: Install test browser
+        working-directory: tools/nsite-archive
+        run: npx playwright install --with-deps chromium
+      - name: Exercise mobile directory and offline import
+        run: npm run test:browser --prefix tools/nsite-archive
+      - name: Verify actual sandboxed screenshots and blocked external requests
+        run: npm run test:sandbox --prefix tools/nsite-archive

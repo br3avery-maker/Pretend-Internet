@@ -1,0 +1,23 @@
+{
+  "name": "@pretend-internet/nsite-archive",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node cli.mjs",
+    "test:browser": "node test/browser.mjs",
+    "test:sandbox": "node test/sandbox.mjs"
+  },
+  "dependencies": {
+    "@hashtree/core": "0.3.2",
+    "parse5": "8.0.0",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
