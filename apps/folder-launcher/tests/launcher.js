@@ -139,9 +139,9 @@ async function makeHTML(app){
   const href=URL.createObjectURL(blob);urls.push(href);const fragment=url.indexOf('#');return fragment<0?href:href+url.slice(fragment);
  }
  async function rewriteCSS(css,dir){
-  const matcher=/url\(\s*(['"]?)([^)'"\s]+)\1\s*\)/gi;
+  const matcher=/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s]+))\s*\)/gi;
   const matches=[...css.matchAll(matcher)];
-  for(const m of matches){const converted=await convert(m[2],dir);css=css.replace(m[0],'url('+JSON.stringify(converted)+')')}
+  for(const m of matches){const converted=await convert(m[1]??m[2]??m[3],dir);css=css.replace(m[0],'url('+JSON.stringify(converted)+')')}
   return css;
  }
  for(const elem of doc.querySelectorAll('[src],[href],[poster]')){
