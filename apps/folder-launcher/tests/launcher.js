@@ -2,7 +2,7 @@
 const NATIVE=!!(window.AndroidLauncher&&typeof window.AndroidLauncher.listApps==='function');
 const $=id=>document.getElementById(id);
 const extensions=['png','webp','jpg','jpeg','svg','gif','avif'];
-let folder=null,entries=[],objectUrls=[],activeUrls=[],active='',openToken=0,recheckLock=false,refreshQueued=false;
+let folder=null,entries=[],objectUrls=[],activeUrls=[],active='',openToken=0,recheckLock=false,refreshQueued=false,activeSource='folder';
 const dbName='folder-launcher-v1';
 function storage(){return new Promise((resolve,reject)=>{const req=indexedDB.open(dbName,1);req.onupgradeneeded=()=>{const d=req.result;d.createObjectStore('settings');d.createObjectStore('files')};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function dbGet(store,key){const d=await storage();return new Promise((res,rej)=>{const t=d.transaction(store,'readonly'),q=t.objectStore(store).get(key);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);t.oncomplete=()=>d.close()})}
@@ -100,14 +100,14 @@ function closeSettings(){ $('shade').classList.remove('show');$('shade').setAttr
 async function getPermission(h,request=false){if(!h)return false;try{let s=await h.queryPermission({mode:'read'});if(s==='granted')return true;if(request&&h.requestPermission)s=await h.requestPermission({mode:'read'});return s==='granted'}catch{return false}}
 async function scanDir(){if(!folder||!(await getPermission(folder)))return false;const files=[];for await(const [,handle] of folder.entries()){if(handle.kind!=='file')continue;const file=await handle.getFile();files.push(file)}entries=await buildCatalog(files);paint();renderSource('Connected folder: '+folder.name);status(entries.length+' apps found');return true}
 async function scanCache(){const records=await dbAll();entries=await buildCatalog(records.map(r=>r.file));paint();renderSource('Imported copies: '+records.length+' files');status(entries.length+' apps found in saved imports')}
-async function refresh(){if(recheckLock){refreshQueued=true;return}recheckLock=true;try{if(NATIVE){const list=JSON.parse(window.AndroidLauncher.listApps());entries=list.map(x=>({name:x.id,label:x.label,iconUrl:x.iconUrl,native:true}));paint();renderSource(window.AndroidLauncher.folderName()||'No folder selected');status(entries.length+' apps found');return}if(!(await scanDir()))await scanCache()}catch(e){status('Cannot read folder: '+e.message)}finally{recheckLock=false;if(refreshQueued){refreshQueued=false;void refresh()}}}
+async function refresh(){if(recheckLock){refreshQueued=true;return}recheckLock=true;try{if(NATIVE){const list=JSON.parse(window.AndroidLauncher.listApps());entries=list.map(x=>({name:x.id,label:x.label,iconUrl:x.iconUrl,native:true}));paint();renderSource(window.AndroidLauncher.folderName()||'No folder selected');status(entries.length+' apps found');return}if(activeSource==='imports'||!(await scanDir()))await scanCache()}catch(e){status('Cannot read folder: '+e.message)}finally{recheckLock=false;if(refreshQueued){refreshQueued=false;void refresh()}}}
 async function chooseFolder(){if(NATIVE){window.AndroidLauncher.chooseFolder();closeSettings();return}if(typeof window.showDirectoryPicker==='function'){
-try{const h=await window.showDirectoryPicker({id:'launcher-apps',mode:'read'});if(!await getPermission(h,true)){status('Folder permission not granted');return}folder=h;await dbPut('settings','folder',h);await refresh();closeSettings();return}catch(err){if(err.name==='AbortError')return;status('Folder picker unavailable here; use Import HTML/ZIP instead. ('+err.name+')');return}}
+try{const h=await window.showDirectoryPicker({id:'launcher-apps',mode:'read'});if(!await getPermission(h,true)){status('Folder permission not granted');return}folder=h;await dbPut('settings','folder',h);activeSource='folder';await dbPut('settings','activeSource',activeSource);await refresh();closeSettings();return}catch(err){if(err.name==='AbortError')return;status('Folder picker unavailable here; use Import HTML/ZIP instead. ('+err.name+')');return}}
 $('folderInput').click();status('Select the directory. On some Web2App wrappers, folder selection is unavailable; use Import files instead.')}
-async function storeFiles(files){if(!files.length)return;let count=0;for(const f of files){if(!f.name)continue;await dbPut('files',f.name.toLowerCase(),{name:f.name,file:f});count++}await scanCache();status(count+' files saved; '+entries.length+' matching apps');closeSettings()}
+async function storeFiles(files){if(!files.length)return;let count=0;for(const f of files){if(!f.name)continue;await dbPut('files',f.name.toLowerCase(),{name:f.name,file:f});count++}activeSource='imports';await dbPut('settings','activeSource',activeSource);await scanCache();status(count+' files saved; '+entries.length+' matching apps');closeSettings()}
 // A single-file HTML app works untouched. Relative links to sibling files are rewritten
 // to object URLs for images, scripts and styles when those files are in the selected folder.
-async function fileList(){if(folder&&await getPermission(folder)){const out=[];for await(const [,handle] of folder.entries())if(handle.kind==='file')out.push(await handle.getFile());return out}return (await dbAll()).map(x=>x.file)}
+async function fileList(){if(activeSource==='folder'&&folder&&await getPermission(folder)){const out=[];for await(const [,handle] of folder.entries())if(handle.kind==='file')out.push(await handle.getFile());return out}return (await dbAll()).map(x=>x.file)}
 async function makeHTML(app){
  const index=app.zip?app.index:null;
  const raw=app.zip?await (await zipRead(index,app.entry)).text():await app.html.text();
@@ -157,5 +157,5 @@ window.addEventListener('focus',()=>{if(!active)refresh()});document.addEventLis
 window.onNativeCatalogChanged=()=>refresh();window.onNativeAppReturned=()=>{returnHome(true);refresh()};$('gear').onclick=openSettings;$('dismiss').onclick=closeSettings;$('shade').onclick=e=>{if(e.target===$('shade'))closeSettings()};$('scan').onclick=refresh;$('choose').onclick=chooseFolder;$('back').onclick=()=>returnHome();
 $('import').onclick=()=>{status('Select HTML, optional matching images, or ZIP apps.');$('filesInput').click()};$('clear').onclick=async()=>{await dbClear('files');await refresh();status('Imported copies cleared')};
 $('folderInput').onchange=async e=>{await storeFiles([...e.target.files]);e.target.value=''};$('filesInput').onchange=async e=>{await storeFiles([...e.target.files]);e.target.value=''};
-(async()=>{if(!NATIVE){try{folder=await dbGet('settings','folder')}catch{folder=null}}await refresh()})().catch(e=>status(e.message));
+(async()=>{if(!NATIVE){try{folder=await dbGet('settings','folder');activeSource=(await dbGet('settings','activeSource'))==='imports'?'imports':'folder'}catch{folder=null}}await refresh()})().catch(e=>status(e.message));
 })();

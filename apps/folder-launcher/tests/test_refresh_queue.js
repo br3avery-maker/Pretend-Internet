@@ -17,6 +17,7 @@ function harness() {
   const errors = [];
   const context = vm.createContext({
     NATIVE: false,
+    activeSource: 'folder',
     scanDir() {
       calls++;
       return calls === 1
