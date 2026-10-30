@@ -628,9 +628,14 @@ export class Archive {
       } catch (e) {
         errors.push({ hash: row.hash, error: e.message });
       }
-    for (const row of this.all('SELECT hash FROM blobs'))
+    for (const row of this.all('SELECT hash,root,parts FROM blobs'))
       try {
         this.read(row.hash);
+        const root = merkleFile(parse(row.parts), (hash, bytes) => {
+          const stored = fs.readFileSync(this.objectPath(hash));
+          if (!stored.equals(bytes)) throw Error('corrupt-merkle-node');
+        });
+        if (root !== row.root) throw Error('corrupt-merkle-root');
         blobs++;
       } catch (e) {
         errors.push({ hash: row.hash, error: e.message });

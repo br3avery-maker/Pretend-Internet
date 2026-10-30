@@ -273,3 +273,13 @@ test('static visual sanitizer removes active elements and network references', (
   assert.ok(html.includes('local.png'));
   assert.ok(html.includes('Visible text'));
 });
+
+test('integrity audit binds blob descriptors to the canonical Merkle graph', (t) => {
+  const a = archive(t),
+    bytes = Buffer.from('Merkle descriptor integrity');
+  a.store(bytes, sha(bytes));
+  a.run('UPDATE blobs SET root=? WHERE hash=?', '0'.repeat(64), sha(bytes));
+  const report = a.verify();
+  assert.equal(report.status, 'failed');
+  assert.ok(report.errors.some((e) => e.error === 'corrupt-merkle-root'));
+});
