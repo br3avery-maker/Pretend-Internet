@@ -116,12 +116,14 @@ function localResourcePath(url,dir){
  }catch{return null}
 }
 async function makeHTML(app){
+ const urls=[];
+ try{
  const index=app.zip?app.index:null;
  const raw=app.zip?await (await zipRead(index,app.entry)).text():await app.html.text();
  const files=app.zip?[]:await fileList();
  const byName=new Map(files.map(f=>[f.name.toLocaleLowerCase(),f]));
  const doc=new DOMParser().parseFromString(raw,'text/html');
- const urls=[],activeCSS=new Set(),base=app.zip?(app.entry.includes('/')?app.entry.slice(0,app.entry.lastIndexOf('/')+1):''):'';
+ const activeCSS=new Set(),base=app.zip?(app.entry.includes('/')?app.entry.slice(0,app.entry.lastIndexOf('/')+1):''):'';
  async function convert(url,dir=base){
   if(!url||/^(#|data:|blob:|https?:|mailto:|tel:|\/\/)/i.test(url)||url.startsWith('/'))return url;
   const path=localResourcePath(url,dir);
@@ -150,7 +152,6 @@ async function makeHTML(app){
   for(const m of matches){const converted=await convert(m[1]??m[2]??m[3],dir);css=css.replace(m[0],'url('+JSON.stringify(converted)+')')}
   return css;
  }
- try{
  for(const elem of doc.querySelectorAll('[src],[href],[poster]')){
   for(const attr of ['src','href','poster'])if(elem.hasAttribute(attr))elem.setAttribute(attr,await convert(elem.getAttribute(attr)));
  }
