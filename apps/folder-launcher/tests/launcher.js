@@ -51,8 +51,11 @@ async function zipRead(index,entry){
  const info=typeof entry==='string'?index.entries.get(entry):entry;if(!info)throw Error('ZIP entry not found');
  const {buffer,view}=index,pos=info.offset;
  if(pos+30>buffer.byteLength||view.getUint32(pos,true)!==0x04034b50)throw Error('Invalid ZIP file entry');
- const start=pos+30+view.getUint16(pos+26,true)+view.getUint16(pos+28,true),end=start+info.size;
+ const nameLength=view.getUint16(pos+26,true),extraLength=view.getUint16(pos+28,true);
+ const start=pos+30+nameLength+extraLength,end=start+info.size;
  if(end>buffer.byteLength)throw Error('Truncated ZIP data');
+ const localName=new TextDecoder('utf-8').decode(new Uint8Array(buffer,pos+30,nameLength));
+ if(localName!==info.name||view.getUint16(pos+8,true)!==info.method)throw Error('ZIP local header does not match directory');
  const compressed=new Blob([buffer.slice(start,end)]);
  if(info.method===0)return new Blob([compressed],{type:zipMime(info.name)});
  if(info.method===8&&typeof DecompressionStream==='function'){
