@@ -47,16 +47,30 @@ export class Collector {
     }
     const filters = urls.length ? urls.map(resolveURL) : KINDS.map((kind) => ({ kinds: [kind] }));
     const scanKeys = filters.map((f) => JSON.stringify(f));
-    const priority = (relay) =>
-      scanKeys.some(
-        (key) =>
-          !['complete', 'incomplete-gaps'].includes(
-            a.one('SELECT status FROM scans WHERE relay=? AND filter=?', relay, key)?.status,
-          ),
+    const authors = a.all('SELECT DISTINCT pubkey FROM events WHERE manifest IS NOT NULL');
+    const priority = (relay) => {
+      if (
+        scanKeys.some(
+          (key) =>
+            !['complete', 'incomplete-gaps'].includes(
+              a.one('SELECT status FROM scans WHERE relay=? AND filter=?', relay, key)?.status,
+            ),
+        )
       )
-        ? 0
-        : 1;
-    pending.sort((x, y) => priority(x) - priority(y));
+        return 0;
+      for (const { pubkey } of authors)
+        for (const kind of [10002, 10063]) {
+          const key = JSON.stringify({ kinds: [kind], authors: [pubkey] });
+          if (
+            a.one('SELECT status FROM scans WHERE relay=? AND filter=?', relay, key)?.status !==
+            'complete'
+          )
+            return 1;
+        }
+      return 2;
+    };
+    const priorities = new Map(pending.map((relay) => [relay, priority(relay)]));
+    pending.sort((x, y) => priorities.get(x) - priorities.get(y));
     const seenAuthors = new Set();
     const query = async (relay, filter, limit = o.pageSize) => {
       if (report.queries >= o.maxQueries || Date.now() - start >= o.maxSeconds * 1000) {

@@ -196,11 +196,11 @@ async function main() {
     } else if (cmd === 'discover')
       print(await collector.discover({ ...config, refresh: options.refresh }));
     else if (cmd === 'download') print(await collector.download({ retry: options.retry }));
-    else if (cmd === 'index') print(archive.index());
+    else if (cmd === 'index') print(archive.index({ retry: options.retry }));
     else if (cmd === 'sync') {
       print({ discovery: await collector.discover({ ...config, refresh: options.refresh }) });
       print({ download: await collector.download({ retry: options.retry }) });
-      print({ index: archive.index() });
+      print({ index: archive.index({ retry: options.retry }) });
       if (config.previews !== false) await previews(archive, config, print);
     } else if (cmd === 'screenshots') await previews(archive, config, print);
     else if (cmd === 'export') {

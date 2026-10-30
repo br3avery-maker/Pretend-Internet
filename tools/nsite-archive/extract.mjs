@@ -1,9 +1,35 @@
 import { parse } from 'parse5';
 import path from 'node:path/posix';
 
-export const EXTRACTOR = 'html-text-v1';
+export const EXTRACTOR = 'html-text-v2';
 const clean = (s) => s.replace(/\s+/g, ' ').trim();
 const ignored = new Set(['script', 'style', 'template', 'noscript', 'svg', 'head']);
+const MAX_NODES = 100000;
+function* walk(root, skip = new Set()) {
+  const pending = [root];
+  let visited = 0;
+  while (pending.length) {
+    const current = pending.pop();
+    if (++visited > MAX_NODES) throw Error('html-node-limit');
+    yield current;
+    if (skip.has(current.tagName)) continue;
+    const children = current.childNodes ?? [];
+    for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]);
+  }
+}
+function text(root, limit = 1048576) {
+  const parts = [];
+  let length = 0;
+  for (const node of walk(root, ignored)) {
+    if (node.nodeName !== '#text') continue;
+    const value = clean(node.value);
+    if (!value) continue;
+    parts.push(value.slice(0, limit - length));
+    length += value.length + 1;
+    if (length >= limit) break;
+  }
+  return parts.join(' ').slice(0, limit);
+}
 const voids = new Set([
   'area',
   'base',
@@ -38,13 +64,7 @@ export function extractHTML(bytes, pagePath) {
       language: null,
       subjects: [],
     };
-  const text = (n) =>
-    n.nodeName === '#text'
-      ? n.value
-      : ignored.has(n.tagName)
-        ? ''
-        : (n.childNodes ?? []).map(text).join(' ');
-  const visit = (n) => {
+  for (const n of walk(doc)) {
     const a = Object.fromEntries((n.attrs ?? []).map((x) => [x.name, x.value]));
     if (n.tagName === 'title')
       output.title = clean((n.childNodes ?? []).map((x) => x.value ?? '').join(''));
@@ -52,7 +72,8 @@ export function extractHTML(bytes, pagePath) {
       output.metadata[a.name || a.property] = a.content ?? '';
     if (n.tagName === 'html' && a.lang)
       output.language = { value: a.lang, basis: 'html-lang', inferred: false };
-    if (/^h[1-6]$/.test(n.tagName)) output.headings.push(clean(text(n)));
+    if (/^h[1-6]$/.test(n.tagName) && output.headings.length < 4096)
+      output.headings.push(text(n, 8192));
     if (n.tagName === 'a' && a.href && output.links.length < 4096) {
       try {
         const url = new URL(a.href, `https://archive.invalid${pagePath}`);
@@ -60,17 +81,15 @@ export function extractHTML(bytes, pagePath) {
           output.links.push({
             href:
               url.hostname === 'archive.invalid' ? url.pathname + url.search + url.hash : url.href,
-            text: clean(text(n)).slice(0, 300),
+            text: text(n, 300),
             outbound: url.hostname !== 'archive.invalid',
           });
       } catch {
         /* invalid link */
       }
     }
-    for (const child of n.childNodes ?? []) visit(child);
-  };
-  visit(doc);
-  output.text = clean(text(doc)).slice(0, 1048576);
+  }
+  output.text = text(doc);
   output.description = output.metadata.description || output.metadata['og:description'] || '';
   const terms = new Map();
   for (const word of output.text.toLowerCase().match(/[\p{L}]{4,}/gu) ?? [])
@@ -87,8 +106,20 @@ export function extractHTML(bytes, pagePath) {
 // provide independent enforcement when a browser renders this output.
 export function visualHTML(bytes) {
   const doc = parse(bytes.toString('utf8'));
-  const render = (n) => {
-    if (n.nodeName === '#text') return escape(n.value);
+  const output = ['<!doctype html>'],
+    pending = [doc];
+  let visited = 0;
+  while (pending.length) {
+    const n = pending.pop();
+    if (typeof n === 'string') {
+      output.push(n);
+      continue;
+    }
+    if (++visited > MAX_NODES) throw Error('html-node-limit');
+    if (n.nodeName === '#text') {
+      output.push(escape(n.value));
+      continue;
+    }
     if (
       [
         'script',
@@ -105,8 +136,12 @@ export function visualHTML(bytes) {
         'meta',
       ].includes(n.tagName)
     )
-      return '';
-    if (!n.tagName) return (n.childNodes ?? []).map(render).join('');
+      continue;
+    if (!n.tagName) {
+      const children = n.childNodes ?? [];
+      for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]);
+      continue;
+    }
     const attrs = (n.attrs ?? [])
       .filter(
         (a) =>
@@ -121,9 +156,14 @@ export function visualHTML(bytes) {
       })
       .map((a) => ` ${a.name}="${escape(a.value)}"`)
       .join('');
-    return `<${n.tagName}${attrs}>${voids.has(n.tagName) ? '' : (n.childNodes ?? []).map(render).join('') + `</${n.tagName}>`}`;
-  };
-  return '<!doctype html>' + render(doc);
+    output.push(`<${n.tagName}${attrs}>`);
+    if (!voids.has(n.tagName)) {
+      pending.push(`</${n.tagName}>`);
+      const children = n.childNodes ?? [];
+      for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]);
+    }
+  }
+  return output.join('');
 }
 export function mime(file) {
   return (

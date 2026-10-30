@@ -53,6 +53,7 @@ test('preview worker requires OS sandbox, isolated context, script blocking and 
                   }),
                   abort: () => assert.fail('main aborted'),
                   fulfill: (reply) => {
+                    assert.equal(reply.headers['content-type'], 'text/html; charset=utf-8');
                     assert.equal(reply.headers['content-security-policy'], PREVIEW_CSP);
                     assert.ok(!reply.body.toString().includes('bad()'));
                     fulfilled = true;

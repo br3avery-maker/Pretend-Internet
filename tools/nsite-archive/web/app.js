@@ -83,7 +83,7 @@ function load(value) {
       .reduce((s, j) => s + j.count, 0),
     incomplete = data.discovery.filter((d) => d.status !== 'complete').length;
   message(
-    `${pending ? `${pending} assets still queued or unavailable. ` : ''}${incomplete ? `${incomplete} relay scans have remaining work or coverage gaps. ` : ''}${data.unindexed?.length ? `${data.unindexed.length} signed manifests preserved with indexing errors. ` : ''}${data.stats.hidden ? `${data.stats.hidden} sites match reversible filters.` : ''}`.trim(),
+    `${pending ? `${pending} assets still queued or unavailable. ` : ''}${incomplete ? `${incomplete} relay scans have remaining work or coverage gaps. ` : ''}${data.unindexed?.length ? `${data.unindexed.length} signed manifests preserved with indexing errors. ` : ''}${data.indexing?.pending ? `${data.indexing.pending} archived pages await indexing. ` : ''}${data.indexing?.failures?.length ? `${data.indexing.failures.length} page extraction failures retained for retry. ` : ''}${data.stats.hidden ? `${data.stats.hidden} sites match reversible filters.` : ''}`.trim(),
   );
   render();
   route();
