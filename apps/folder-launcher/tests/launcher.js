@@ -1,3 +1,4 @@
+
 (()=>{'use strict';
 const NATIVE=!!(window.AndroidLauncher&&typeof window.AndroidLauncher.listApps==='function');
 const $=id=>document.getElementById(id);
@@ -149,6 +150,7 @@ async function makeHTML(app){
   for(const m of matches){const converted=await convert(m[1]??m[2]??m[3],dir);css=css.replace(m[0],'url('+JSON.stringify(converted)+')')}
   return css;
  }
+ try{
  for(const elem of doc.querySelectorAll('[src],[href],[poster]')){
   for(const attr of ['src','href','poster'])if(elem.hasAttribute(attr))elem.setAttribute(attr,await convert(elem.getAttribute(attr)));
  }
@@ -157,6 +159,11 @@ async function makeHTML(app){
   else if(elem.hasAttribute('style'))elem.setAttribute('style',await rewriteCSS(elem.getAttribute('style'),base));
  }
  return {html:'<!doctype html>\n'+doc.documentElement.outerHTML,urls};
+ }catch(error){
+  // Revoke resources created before an unreadable file or corrupt ZIP aborts preparation.
+  urls.forEach(href=>URL.revokeObjectURL(href));
+  throw error;
+ }
 }
 function releaseActiveUrls(){activeUrls.forEach(u=>URL.revokeObjectURL(u));activeUrls=[]}
 async function openApp(app){closeSettings();const token=++openToken;releaseActiveUrls();active=app.name;$('player').classList.add('active');$('gear').style.display='none';if(!location.hash.startsWith('#/app/'))history.pushState({app:app.name},'', '#/app/'+encodeURIComponent(app.name));if(app.native){window.AndroidLauncher.launchApp(app.name);$('player').classList.remove('active');return}
