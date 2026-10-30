@@ -1,0 +1,31 @@
+name: Event-kind relay router
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/relay-router/**'
+      - '.github/workflows/relay-router.yml'
+  pull_request:
+    paths:
+      - 'tools/relay-router/**'
+      - '.github/workflows/relay-router.yml'
+jobs:
+  relay-router:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/relay-router/package-lock.json
+      - name: Install pinned dependencies
+        working-directory: tools/relay-router
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify universal routing and protocol boundaries
+        working-directory: tools/relay-router
+        run: |
+          npm test
+          node test/mutation.mjs
+          node demo.mjs
