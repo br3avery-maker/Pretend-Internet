@@ -28,3 +28,8 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build
           npm run check
+      - name: Verify Folder Launcher source contract and browser regressions
+        run: |
+          python3 apps/folder-launcher/tests/test_source_contract.py
+          node --check apps/folder-launcher/tests/launcher.js
+          node --test apps/folder-launcher/tests/test_*.js
