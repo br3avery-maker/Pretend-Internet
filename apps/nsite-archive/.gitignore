@@ -2,3 +2,4 @@ dist/
 test/test-bundle.json
 test/test-events.json
 test/ui-app.html
+test/collect-fixture.html

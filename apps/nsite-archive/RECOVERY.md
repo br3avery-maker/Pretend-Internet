@@ -11,3 +11,5 @@ The engines contain bundled Buffer (MIT), ieee754 (BSD-3-Clause), noble hashes/c
 An original Android signing key was not provided. This repair does not replace or re-sign the supplied APK, claim update compatibility, or remove user data.
 
 Review correction: the restored-file map and the bundled fflate ZIP flattening dictionary use null prototypes, and ZIP traversal only visits own properties. This narrow vendor correction preserves accepted filenames such as `__proto__`, `constructor` and Unicode names; its regression decodes every central-directory entry and compares decompressed bytes.
+
+Version 0.2.2 replaces the hash-navigation application with nine real HTML documents and separate page-controller modules. The old `app.js` remains recoverable in Git history and is removed from the runtime package. Workers and archive bytes are preserved; cross-document collection navigation checkpoints and pauses rather than claiming ongoing background work.

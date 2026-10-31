@@ -14,9 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test test/model.test.mjs
+      - run: node --test test/model.test.mjs test/documents.test.mjs
         working-directory: apps/nsite-archive
       - run: sh build.sh
         working-directory: apps/nsite-archive
-      - run: node --check app.js && node --check archive-worker.js && node --check collect-worker.js
+      - run: for f in *.js pages/*.js; do node --check "$f"; done
         working-directory: apps/nsite-archive

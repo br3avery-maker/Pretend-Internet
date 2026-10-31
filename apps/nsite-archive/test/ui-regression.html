@@ -1,19 +1,22 @@
-<!doctype html><meta charset="utf-8"><title>Archive UI regressions</title><button id="run">Run UI regressions</button><pre id="results">Ready</pre><iframe title="Test application" style="width:390px;height:844px;border:0" src="ui-app.html"></iframe>
+<!doctype html><meta charset="utf-8"><title>Archive document navigation regressions</title><button id="run">Run UI regressions</button><pre id="results">Ready</pre><iframe title="Test application" style="width:390px;height:844px;border:0" src="../index.html"></iframe>
 <script type="module">
-const output=document.querySelector('#results'),frame=document.querySelector('iframe');
+const output=document.querySelector('#results'),frame=document.querySelector('iframe');let loads=0;frame.addEventListener('load',()=>loads++);
 const check=(value,message)=>{if(!value)throw Error(message);output.textContent+='\nPASS '+message;};
 async function until(predicate){const start=Date.now();while(!predicate()){if(Date.now()-start>15000)throw Error('Timed out waiting for UI state');await new Promise(r=>setTimeout(r,25));}}
-document.querySelector('#run').onclick=async()=>{output.textContent='Testing actual application handlers…';try{
- const win=frame.contentWindow,doc=win.document;win.location.hash='#/library';await until(()=>doc.querySelector('#search-form'));
- win.expectedCollectionTitle='Collected refresh result '+Date.now();win.location.hash='#/collect';await until(()=>doc.querySelector('[data-action="start"]'));
+async function visit(url,selector){const before=frame.contentDocument;frame.src=url;await until(()=>frame.contentDocument!==before&&frame.contentDocument.querySelector(selector));return frame.contentDocument;}
+document.querySelector('#run').onclick=async()=>{output.textContent='Testing independent HTML documents…';try{
+ await until(()=>frame.contentDocument.querySelector('#search-form'));const initial=frame.contentDocument;
+ let doc=await visit('collect-fixture.html','[data-action="start"]');const title='Collected refresh result '+Date.now();frame.contentWindow.expectedCollectionTitle=title;
  doc.querySelector('[data-action="start"]').click();await until(()=>doc.querySelector('#activity-message').textContent.includes('Run finished'));
- win.location.hash='#/library';await until(()=>doc.querySelector('#search-form'));
- await until(()=>doc.querySelector('#app').textContent.includes(win.expectedCollectionTitle));check(true,'collection completed on Collect refreshes Library without reload');
- win.location.hash='#/collect';await until(()=>doc.querySelector('#event-import'));
+ doc=await visit('../index.html','#search-form');await until(()=>doc.querySelector('#app').textContent.includes(title));check(doc!==initial&&loads>=2,'collection result appears in a separately loaded Library document');
+ doc=await visit('collect-fixture.html','#event-import');
  const event=(await(await fetch('test-events.json')).json())[0],input=doc.querySelector('#event-import'),transfer=new DataTransfer();
- transfer.items.add(new File([JSON.stringify(Array(512).fill(event))],'many-events.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new win.Event('change',{bubbles:true}));
+ transfer.items.add(new File([JSON.stringify(Array(512).fill(event))],'many-events.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
  await until(()=>doc.querySelector('#activity-message').textContent.includes('Importing '));check(Boolean(doc.querySelector('#cancel-task')),'Cancel remains available after worker progress updates');
  doc.querySelector('#cancel-task').click();await until(()=>/cancelled/i.test(doc.querySelector('#activity-message').textContent));check(!doc.querySelector('#cancel-task'),'Cancel stops the operation and restores controls');
+ const before=doc;doc=await visit('../help.html','h1');check(doc!==before&&doc.querySelector('h1').textContent==='Help','Help is a separate readable HTML document');
+ doc=await visit('../collect.html','[data-setting="targets"]');doc.querySelector('[data-setting="targets"]').value='https://selected.example/';doc.querySelector('[data-setting="targets"]').dispatchEvent(new frame.contentWindow.Event('input',{bubbles:true}));
+ await visit('../index.html','#search-form');doc=await visit('../collect.html','[data-setting="targets"]');check(doc.querySelector('[data-setting="targets"]').value==='https://selected.example/','collection settings survive ordinary document navigation');
  output.textContent+='\nALL UI REGRESSIONS PASSED';
 }catch(error){output.textContent+='\nFAIL '+error.stack;}};
 </script>
