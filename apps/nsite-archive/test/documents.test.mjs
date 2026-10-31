@@ -8,6 +8,7 @@ test('ten separately loadable HTML documents have independent controllers and or
   const script=html.match(/<script type="module" src="([^"]+)"/)[1];assert(fs.existsSync(path.resolve(root,script)));controllers.add(script);
   for(const [,href] of html.matchAll(/href="([^"]+)"/g)){if(!href.startsWith('http'))assert(fs.existsSync(path.resolve(root,href.split('?')[0])),`${name}: ${href}`);}
  }
+ const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.webmanifest'),'utf8')),icon=fs.readFileSync(path.resolve(root,manifest.icons[0].src));assert.equal(manifest.icons[0].sizes,icon.readUInt32BE(16)+'x'+icon.readUInt32BE(20),'manifest icon size matches actual PNG');
  assert.equal(controllers.size,10);assert(!fs.existsSync(path.join(root,'app.js')));
 });
 test('all page controllers navigate documents rather than swapping routes',()=>{
