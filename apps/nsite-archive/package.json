@@ -1,0 +1,11 @@
+{
+  "name": "nsite-archive-browser",
+  "private": true,
+  "version": "0.2.1",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/model.test.mjs",
+    "build": "sh build.sh",
+    "test:browser:prepare": "node test/prepare-browser.mjs"
+  }
+}
