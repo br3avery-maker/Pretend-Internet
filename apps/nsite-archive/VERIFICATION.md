@@ -1,4 +1,26 @@
-# Verification — multi-page repair 0.2.2
+# Verification — archive workflow repair 0.3.0
+
+## Current executed evidence (2026-10-31)
+
+- Node 24: 13 browser-model/document/content/sanitization regressions pass, including directory readiness gating and exact-content stacking across separate signed publishers. All runtime JS syntax checks and the POSIX build pass.
+- Existing untouched Node archive and relay-router suites: 68/68 tests pass after installing their pinned lockfile dependencies locally. The application itself remains buildless and dependency-free at runtime.
+- Actual cloud Chrome on the managed HTTP preview: browser pipeline checks pass for content-derived untitled search, confirmed campaign exclusion, path/byte/verification progress, interrupted stream staging, Range resume and native hash parity, real PNG capture of sanitized archived HTML, full backup import into an independently named fresh database, and manual download/index controls in separate documents.
+- Actual collector HTTP fixture on the disposable origin: leave Downloads for Publishers while a durable selected queue is active; the next document resumes collection automatically, verifies the real HTTP bytes, and finishes without another manual Start. Directory reflow passes at 320/390/844 CSS pixels and 16/32px text.
+- Bounded live read-side verification: relay.nsite.lol returned current signed root manifests. A five-file publication `15128:7055f2f217d2e59c02bce810a727ee902c21df2ca28d642ba09735f28f30f2c2:` was retrieved directly from `https://nostr.download`, streamed, verified and indexed. All 5/5 declared files completed: `/.well-known/nostr.json`, `/404.html`, `/index.html`, `/ledger/index.html`, `/scorecard/index.html`. The genuine page was searchable in the curated directory, its archived HTML was captured as a PNG, and a full archive was imported into a new database; every restored file reproduced its native SHA-256. No proxy, account, signer or publication was used.
+- A separate Hoardstr manifest was correctly rejected for an aggregate mismatch. Its claimed aggregate was `6cbf340b8a11eba70a320475fe63da346ced280e03ed1e71fd1d840bdb8a2768`; the required sorted hash/path line calculation produced `43dad69cfd0e57725900c81226cbd32119d148240d0325b816932ae44bed1ee8`. Checked against current NIP-5A: https://github.com/nostr-protocol/nips/blob/master/5A.md#aggregate-hash . Validation was not weakened to make a live test pass.
+- Insecure-origin compatibility: relay subscription IDs no longer require secure-context-only `crypto.randomUUID`; cryptographic random bytes produce the subscription identifier. The native signature/hash/chunk/Merkle algorithms are unchanged.
+
+## Remaining target boundaries
+
+The managed preview is HTTP and not a secure context: actual cross-document **dedicated-worker fallback** was verified; service-worker offline startup needs a secure-origin runtime test. Collection uses the verified automatic dedicated-worker resume path on all origins. No installed Android runtime/signing project is attached, and the supplied APK is unchanged. Android picker/download bridge/system Back, OS suspension, real quota exhaustion and multi-tab fault injection remain separate field checks. Do not infer them from the passing browser checks. Static previews disable source scripts and external dependencies; they do not promise arbitrary JavaScript applications run offline.
+
+The delivered ZIP must contain all ten HTML documents, ten controllers, worker/index/render modules, icon/manifest and vendored engines; exclude fixtures, development harnesses and old app.js. Keep issue #17 open for target verification and user acceptance. No public deployment, publishing or recurring job was performed.
+
+---
+
+## Historical 0.2.2 evidence — does not establish product acceptance
+
+
 
 ## Executed
 
