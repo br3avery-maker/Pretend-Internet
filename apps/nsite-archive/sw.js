@@ -1,11 +1,5 @@
-const CACHE='nsite-archive-shell-0.2.2-documents';
-const pages=['index','publishers','site','history','compare','page','collect','backup','help'];
-const FILES=['./',...pages.map(p=>'./'+p+'.html'),'./ui.js','./archive-client.js','./collection.js','./storage.js','./style.css','./model.js','./archive-worker.js','./collect-worker.js',...['library','publishers','site','history','compare','page','collect','backup','help'].map(p=>'./pages/'+p+'.js'),'./vendor/archive-engine.js','./vendor/collector-engine.js'];
+const CACHE='nsite-archive-shell-0.3.0-r2';
+const FILES=["./screenshot.js","./", "./backup.html", "./collect.html", "./compare.html", "./help.html", "./history.html", "./index.html", "./page.html", "./publishers.html", "./site.html", "./view.html", "./archive-client.js", "./archive-worker.js", "./collect-worker.js", "./collection.js", "./collector.js", "./icons.js", "./indexer.js", "./model.js", "./previews.js", "./safe-page.js", "./storage.js", "./ui.js", "./pages/backup.js", "./pages/collect.js", "./pages/compare.js", "./pages/help.js", "./pages/history.js", "./pages/library.js", "./pages/page.js", "./pages/publishers.js", "./pages/site.js", "./pages/view.js", "./vendor/archive-engine.js", "./vendor/collector-engine.js", "./manifest.webmanifest", "./assets/app-icon.png"];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith('nsite-archive-shell-')&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));
-self.addEventListener('fetch',e=>{
- if(e.request.method!=='GET')return;
- const url=new URL(e.request.url),scope=new URL(self.registration.scope);
- if(url.origin!==scope.origin||!FILES.some(f=>new URL(f,scope).pathname===url.pathname))return;
- e.respondWith(caches.open(CACHE).then(async c=>(await c.match(e.request,{ignoreSearch:true}))||fetch(e.request)));
-});
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const url=new URL(e.request.url),scope=new URL(self.registration.scope);if(url.origin!==scope.origin||!FILES.some(f=>new URL(f,scope).pathname===url.pathname))return;e.respondWith(caches.open(CACHE).then(async c=>(await c.match(e.request,{ignoreSearch:true}))||fetch(e.request)));});

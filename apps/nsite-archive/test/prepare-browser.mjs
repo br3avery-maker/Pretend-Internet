@@ -1,7 +1,6 @@
 import fs from 'node:fs';import {fixtureBundle,signed} from './fixtures.mjs';
 fs.writeFileSync(new URL('./test-bundle.json',import.meta.url),JSON.stringify(fixtureBundle()));
 fs.writeFileSync(new URL('./test-events.json',import.meta.url),JSON.stringify([signed({identifier:'imported',title:'Imported signed publication'}).event]));
-const shell=fs.readFileSync(new URL('../collect.html',import.meta.url),'utf8');
-const transport=`<script>window.expectedCollectionTitle='';const NativeWorker=window.Worker;window.Worker=class extends NativeWorker{constructor(url,options){const collection=String(url).endsWith('/collect-worker.js');super(collection?new URL('./collection-fixture.js',location.href):url,options);this.collectionFixture=collection;}postMessage(data,...args){if(this.collectionFixture&&data.type==='collect')data.options.testTitle=window.expectedCollectionTitle;super.postMessage(data,...args);}};</script>`;
-fs.writeFileSync(new URL('./collect-fixture.html',import.meta.url),shell.replace('href="./style.css"','href="../style.css"').replace('src="./pages/collect.js"','src="../pages/collect.js"').replace('</head>',transport+'</head>'));
-console.log('Serve this directory on a disposable origin. Open test/browser.html and test/ui-regression.html.');
+const item=signed({identifier:'garden',author:7,files:{'/index.html':'<!doctype html><style>body{background:#f0fff0;color:#123;font:22px sans-serif}h1{color:#a00060}</style><h1>Garden seed exchange</h1><p>Neighbours exchange vegetable seeds and planting advice. Open the notes for seasonal tips.</p><a href="notes.txt">Planting notes</a>','/notes.txt':'Plant tomato seeds in spring. Share seedlings with neighbours.'}});
+fs.writeFileSync(new URL('./pipeline-fixtures.json',import.meta.url),JSON.stringify({bundle:fixtureBundle(),item}));
+console.log('pipeline.html checks the new download/index/preview/recovery flow. For its continuity HTTP check only, serve each item.files body at /<sha256> on the disposable test origin.');
