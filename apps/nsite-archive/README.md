@@ -29,6 +29,6 @@ The lightweight directory export uses `nsite-archive.browser-directory.v2`: filt
 - `vendor/`: recovered engines with readable exported API names; see [RECOVERY.md](RECOVERY.md).
 - `test/`: deterministic fixtures, model regressions and executable browser integrity tests.
 
-Run `node --test test/model.test.mjs`. For browser checks, run `node test/prepare-browser.mjs`, serve the directory and open `test/browser.html` **on a disposable test origin**. It deliberately seeds that origin's archive and checks real IndexedDB, signature/hash rejection, version comparison, ZIP generation, full-backup restoration into a fresh database and local pending-job collection. Test fixtures are excluded from runtime packaging.
+Run `node --test test/model.test.mjs`. For browser checks, run `node test/prepare-browser.mjs`, serve the directory and open `test/browser.html` and `test/ui-regression.html` **on a disposable test origin**. It deliberately seeds that origin's archive and checks real IndexedDB, signature/hash rejection, version comparison, ZIP generation, full-backup restoration into a fresh database and local pending-job collection. Test fixtures are excluded from runtime packaging.
 
 See [VERIFICATION.md](VERIFICATION.md) for tested boundaries. No public crawl, deployment, publication, recurring job or new hosted dependency was introduced.

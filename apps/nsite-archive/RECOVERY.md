@@ -9,3 +9,5 @@ The former UI rebuilt all legacy trees and repeatedly scanned arrays for each re
 The engines contain bundled Buffer (MIT), ieee754 (BSD-3-Clause), noble hashes/curves/ciphers (MIT), scure base (MIT), parse5 (MIT), fflate (MIT) and idb (ISC) implementations from the supplied APK; exact bundled package versions were not recoverable. Embedded copyright/license comments are preserved. No external dependency is downloaded by this app. The repository source and the APK remain the provenance for application-specific work; this recovery does not assert a new blanket upstream license.
 
 An original Android signing key was not provided. This repair does not replace or re-sign the supplied APK, claim update compatibility, or remove user data.
+
+Review correction: the restored-file map and the bundled fflate ZIP flattening dictionary use null prototypes, and ZIP traversal only visits own properties. This narrow vendor correction preserves accepted filenames such as `__proto__`, `constructor` and Unicode names; its regression decodes every central-directory entry and compares decompressed bytes.

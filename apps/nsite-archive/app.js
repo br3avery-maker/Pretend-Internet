@@ -1,4 +1,4 @@
-const app=document.querySelector('#app'), activity=document.querySelector('#activity');
+const app=document.querySelector('#app'), activity=document.querySelector('#activity-message'), activityControls=document.querySelector('#activity-controls');
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=value=>value.length>28?value.slice(0,14)+'…'+value.slice(-8):value;
 const date=value=>new Date(value*1000).toLocaleString();
@@ -28,7 +28,7 @@ async function operation(method,args={},message='Working…'){
   catch(e){activity.textContent=e.message;}
   finally{busy=false;setBusy();}
 }
-function setBusy(){document.querySelectorAll('[data-write]').forEach(el=>el.disabled=busy||Boolean(collector)||el.hasAttribute('data-unavailable'));document.querySelectorAll('[data-action="pause"]').forEach(el=>el.disabled=!collector);document.querySelector('#cancel-task')?.remove();if(busy){const b=document.createElement('button');b.id='cancel-task';b.textContent='Cancel operation';b.onclick=()=>{worker.terminate();for(const p of pending.values())p.reject(Error('Operation cancelled. Completed writes are preserved.'));pending.clear();connect();busy=false;activity.textContent='Cancelled. Saved data is preserved.';setBusy();};activity.append(' ',b);}}
+function setBusy(){document.querySelectorAll('[data-write]').forEach(el=>el.disabled=busy||Boolean(collector)||el.hasAttribute('data-unavailable'));document.querySelectorAll('[data-action="pause"]').forEach(el=>el.disabled=!collector);document.querySelector('#cancel-task')?.remove();if(busy){const b=document.createElement('button');b.id='cancel-task';b.textContent='Cancel operation';b.onclick=()=>{worker.terminate();for(const p of pending.values())p.reject(Error('Operation cancelled. Completed writes are preserved.'));pending.clear();connect();busy=false;activity.textContent='Cancelled. Saved data is preserved.';setBusy();};activityControls.append(b);}}
 function locationState(){const [path,query='']=location.hash.slice(2).split('?');return {screen:path||'library',params:new URLSearchParams(query)};}
 function back(fallback='#/library'){return `<a class="back" href="${escape(fallback)}" data-back>‹ Back</a>`;}
 function filePicker(id,label){return `<label class="button"><span>${label}</span><input class="file-input" id="${id}" type="file" accept=".json,.ndjson,application/json" data-write></label>`;}
@@ -100,12 +100,12 @@ function start(){
   if(!['maxBytes','maxBlobBytes','maxFiles','maxQueries'].every(k=>Number.isSafeInteger(options[k])&&options[k]>0)){activity.textContent='Resource limits must be positive whole numbers.';return;}
   if(!options.relays.length){activity.textContent='Enter at least one relay URL.';return;}
   const run=new Worker(new URL('./collect-worker.js',import.meta.url),{type:'module'});collector=run;setBusy();activity.textContent='Starting collection…';
-  const finish=message=>{if(collector!==run)return;run.terminate();collector=null;activity.textContent=message;setBusy();render(true);};
+  const finish=message=>{if(collector!==run)return;run.terminate();collector=null;activity.textContent=message;setBusy();rpc('invalidate').then(()=>render(true)).catch(e=>{activity.textContent=e.message;});};
   run.onmessage=({data})=>{if(data.type==='progress'){const v=data.value;activity.textContent=v.error||[v.events!==undefined?`${v.events} events discovered`:null,v.count!==undefined?`${v.count} file attempts`:null,v.bytes!==undefined?`${Math.round(v.bytes/1024)} KiB transferred`:null,v.status].filter(Boolean).join(' · ')||'Collecting…';}else if(data.type==='done')finish(`${data.paused?'Paused with saved progress':'Run finished'} · ${data.discovery.events} signed events discovered. Pending failures are listed in Collect.`);else if(data.type==='error')finish(data.message);};
   run.onerror=()=>finish('Collection worker stopped. Saved downloads are preserved; resume to retry.');
   run.postMessage({type:'collect',options});
 }
-function pause(){if(!collector)return;collector.terminate();collector=null;activity.textContent='Paused. Saved files and pending jobs are preserved.';setBusy();render(true);}
+function pause(){if(!collector)return;collector.terminate();collector=null;activity.textContent='Paused. Saved files and pending jobs are preserved.';setBusy();rpc('invalidate').then(()=>render(true)).catch(e=>{activity.textContent=e.message;});}
 app.addEventListener('click',async e=>{
   const target=e.target.closest('[data-action],[data-back]');if(!target)return;
   if(target.hasAttribute('data-back'))return;

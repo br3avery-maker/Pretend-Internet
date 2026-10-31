@@ -1,4 +1,4 @@
-const CACHE='nsite-archive-shell-repair-0.2.1';
+const CACHE='nsite-archive-shell-repair-0.2.1-reviewfix1';
 const FILES=['./','./index.html','./style.css','./app.js','./model.js','./archive-worker.js','./collect-worker.js','./vendor/archive-engine.js','./vendor/collector-engine.js'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith('nsite-archive-shell-')&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));

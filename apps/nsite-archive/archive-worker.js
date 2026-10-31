@@ -22,6 +22,7 @@ async function write(fn) {
   }):run();
 }
 const handlers={
+  async invalidate(){catalog=null;return true;},
   async list(options) {if(!catalog||options.refresh) await refresh();return listCatalog(catalog,options);},
   async detail({site,version}) {
     const v=await getVersion(site,version),all=catalog.bySite.get(site),summary=catalog.sites.find(s=>s.id===site);
@@ -53,7 +54,7 @@ const handlers={
     return diffFiles(a,b,blobs);
   },
   async restore({site,version}) {
-    const v=await getVersion(site,version),d=await open(),files={};
+    const v=await getVersion(site,version),d=await open(),files=Object.create(null);
     for(let i=0;i<v.files.length;i++) {const f=v.files[i];progress(`Verifying ${i+1} of ${v.files.length} files…`);files[f.path.slice(1)]=await engine.readBlob(d,f.hash);}
     return {name:`nsite-${v.id.slice(0,12)}.zip`,blob:new Blob([engine.zip(files)],{type:'application/zip'})};
   },

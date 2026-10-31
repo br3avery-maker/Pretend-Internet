@@ -2,11 +2,13 @@
 
 ## Executed
 
-- Node 24.22.1: seven model/crypto regressions pass. A 10,000-event legacy catalog built in approximately 28–33 ms in this executor; listing returns bounded rows rather than every reconstructed tree. This is an isolated catalog measurement, not a phone benchmark.
+- Node 24.22.1: eight model/crypto/ZIP regressions pass. A 10,000-event legacy catalog built in approximately 28–33 ms in this executor; listing returns bounded rows rather than every reconstructed tree. This is an isolated catalog measurement, not a phone benchmark.
 - JavaScript syntax checks pass; dependency-free POSIX build produces a complete relative-asset tree.
 - Actual cloud Chrome against the local Sites preview service: real IndexedDB/worker imports of nine deterministic signed publications; all six confirmed campaign fixtures excluded from ordinary results; untitled text search; two-version history; native path comparison; verified ZIP bytes; full backup imported into an independently named fresh IndexedDB database; every restored file's native SHA-256 matches; corrupt backup rejected before commit with prior events intact; altered signed event rejected; a single pretty-printed signed event imports; bounded collection worker processes local pending jobs without external requests.
 - Ordinary interface walkthrough in a 390px iframe: search Saturn -> open publication -> read archived page text -> Back -> history -> compare changed/added files -> drawer -> separate Collect screen. Search terms remain in the return route; no collector/backup/help sections occupy the reading/library screen.
 - Reflow inspected at 320, 390 and 844 CSS px with 16px and 32px root text. Initial overflow at 320/844px with enlarged text was corrected; all six final checks pass. Actual phone-width interface was visually inspected.
+
+- Review regressions executed against the actual application: a local signed-event collector fixture completes while the user stays on Collect; Library then shows its new publication without reloading. A 512-event file import emits progress while Cancel remains available; cancelling terminates the worker and restores controls. ZIP central-directory and decompressed-byte checks preserve `__proto__`, `constructor`, `toString`, nested prototype names and Unicode filenames.
 
 ## Limits
 

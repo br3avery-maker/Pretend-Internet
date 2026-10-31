@@ -32,3 +32,17 @@ test('10,000 legacy updates have bounded listing output and linear snapshot mate
  const started=performance.now(),c=buildCatalog(records,[],[],[]),list=listCatalog(c);const elapsed=performance.now()-started;
  assert.equal(list.rows.length,1);assert.equal(list.rows[0].files,10000);assert(elapsed<3000,`10k legacy catalog took ${elapsed}ms`);console.log(`10,000 legacy updates: ${elapsed.toFixed(1)}ms`);
 });
+
+test('restoration ZIP preserves prototype names, Unicode and exact bytes',async()=>{
+ const {zip}=await import('../vendor/archive-engine.js');const {inflateRawSync}=await import('node:zlib');
+ const expected=new Map(['__proto__','constructor','toString','folder/__proto__','日本語.txt'].map(name=>[name,new TextEncoder().encode('bytes for '+name)]));
+ const input=Object.create(null);for(const [name,bytes] of expected)input[name]=bytes;
+ const data=zip(input),view=new DataView(data.buffer,data.byteOffset,data.byteLength),count=view.getUint16(data.length-12,true);let offset=view.getUint32(data.length-6,true);
+ assert.equal(count,expected.size);
+ for(let i=0;i<count;i++){
+  assert.equal(view.getUint32(offset,true),0x02014b50);const length=view.getUint16(offset+28,true),extra=view.getUint16(offset+30,true),comment=view.getUint16(offset+32,true),size=view.getUint32(offset+20,true),local=view.getUint32(offset+42,true),method=view.getUint16(offset+10,true);
+  const name=new TextDecoder().decode(data.subarray(offset+46,offset+46+length)),start=local+30+view.getUint16(local+26,true)+view.getUint16(local+28,true),compressed=data.subarray(start,start+size),bytes=method===0?compressed:inflateRawSync(compressed);
+  assert(expected.has(name),`Unexpected entry ${name}`);assert.deepEqual(Uint8Array.from(bytes),expected.get(name));expected.delete(name);offset+=46+length+extra+comment;
+ }
+ assert.equal(expected.size,0);
+});
