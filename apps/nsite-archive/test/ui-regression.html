@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Archive UI regressions</title><button id="run">Run UI regressions</button><pre id="results">Ready</pre><iframe title="Test application" style="width:390px;height:844px;border:0" src="ui-app.html"></iframe>
+<script type="module">
+const output=document.querySelector('#results'),frame=document.querySelector('iframe');
+const check=(value,message)=>{if(!value)throw Error(message);output.textContent+='\nPASS '+message;};
+async function until(predicate){const start=Date.now();while(!predicate()){if(Date.now()-start>15000)throw Error('Timed out waiting for UI state');await new Promise(r=>setTimeout(r,25));}}
+document.querySelector('#run').onclick=async()=>{output.textContent='Testing actual application handlers…';try{
+ const win=frame.contentWindow,doc=win.document;win.location.hash='#/library';await until(()=>doc.querySelector('#search-form'));
+ win.expectedCollectionTitle='Collected refresh result '+Date.now();win.location.hash='#/collect';await until(()=>doc.querySelector('[data-action="start"]'));
+ doc.querySelector('[data-action="start"]').click();await until(()=>doc.querySelector('#activity-message').textContent.includes('Run finished'));
+ win.location.hash='#/library';await until(()=>doc.querySelector('#search-form'));
+ await until(()=>doc.querySelector('#app').textContent.includes(win.expectedCollectionTitle));check(true,'collection completed on Collect refreshes Library without reload');
+ win.location.hash='#/collect';await until(()=>doc.querySelector('#event-import'));
+ const event=(await(await fetch('test-events.json')).json())[0],input=doc.querySelector('#event-import'),transfer=new DataTransfer();
+ transfer.items.add(new File([JSON.stringify(Array(512).fill(event))],'many-events.json',{type:'application/json'}));input.files=transfer.files;input.dispatchEvent(new win.Event('change',{bubbles:true}));
+ await until(()=>doc.querySelector('#activity-message').textContent.includes('Importing '));check(Boolean(doc.querySelector('#cancel-task')),'Cancel remains available after worker progress updates');
+ doc.querySelector('#cancel-task').click();await until(()=>/cancelled/i.test(doc.querySelector('#activity-message').textContent));check(!doc.querySelector('#cancel-task'),'Cancel stops the operation and restores controls');
+ output.textContent+='\nALL UI REGRESSIONS PASSED';
+}catch(error){output.textContent+='\nFAIL '+error.stack;}};
+</script>

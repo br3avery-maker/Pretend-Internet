@@ -1,0 +1,11 @@
+{
+  "source": "user supplied app-debug.apk",
+  "apk_sha256": "2a76e569918fca7f1da0477a7c4c75a717cbfc880620719914a410d582854151",
+  "assets": {
+    "sw.js": "279b113be2f65dd89fce01b8e1303bb213a3bacd7813c97c0b45be712f7ef103",
+    "index.html": "b0cff45db2e282d7e283da8c309bdb170e927713dee42de11e1c9897e11030dc",
+    "main.css": "ca5739e009b90320e9a7a20f1ae70ac8f16ad07e2d31a576bf3d93ae96ec6058",
+    "main.js": "95244374117a965c1ce928f87571c2e8791d43dfca12bebf19b432a137dcbbe3",
+    "worker.js": "1b0c35c7a3ed2c88b7f51182d6d6a51b3eab5ad2edce8c148bbed5554f89b5b8"
+  }
+}

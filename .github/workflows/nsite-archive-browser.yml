@@ -1,0 +1,22 @@
+name: Nsite archive browser checks
+on:
+  push:
+    paths: ['apps/nsite-archive/**', '.github/workflows/nsite-archive-browser.yml']
+  pull_request:
+    paths: ['apps/nsite-archive/**', '.github/workflows/nsite-archive-browser.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test test/model.test.mjs
+        working-directory: apps/nsite-archive
+      - run: sh build.sh
+        working-directory: apps/nsite-archive
+      - run: node --check app.js && node --check archive-worker.js && node --check collect-worker.js
+        working-directory: apps/nsite-archive

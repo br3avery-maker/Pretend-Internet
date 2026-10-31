@@ -39,3 +39,7 @@ Nothing in this repository automatically imports, archives, or deletes ChatGPT L
 ## Local nsite archive and content search
 
 [Nsite Archive](tools/nsite-archive/) is an independent local worker and portable static directory for issue #14: relay discovery, complete bounded asset collection, native hash verification, shared CDC chunks/Hashtree nodes, signed version history, actual page-text search, safe screenshot capture, publisher counts and reversible filtering. It reuses the existing [relay router](tools/relay-router/) read transport. It is not part of the launcher/APK build and starts no public crawler, publisher or recurring job. See its [run instructions](tools/nsite-archive/README.md) and [verification evidence](tools/nsite-archive/VERIFICATION.md).
+
+## Browser nsite archive repair
+
+The independently runnable [Nsite Archive browser app](apps/nsite-archive/) repairs the APK interface reported in #17. It preserves the existing archive database/backup format, moves expensive work to workers, provides separate application routes, and applies the manually confirmed campaign exclusions. [Verification](apps/nsite-archive/VERIFICATION.md) separates browser fixture/runtime evidence from live network and installed APK testing. It is not included in the older root launcher build; use its own `build.sh` or WebToApp sub-path `apps/nsite-archive`.

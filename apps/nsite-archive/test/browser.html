@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>Archive regression checks</title><button id="run">Run archive checks</button><pre id="out">Ready</pre><a href="../">Open tested application</a><script type="module">
+import * as engine from '../vendor/archive-engine.js';
+const out=document.querySelector('#out'),check=(test,message)=>{if(!test)throw Error(message);out.textContent+='\nPASS '+message;};
+const w=new Worker('../archive-worker.js',{type:'module'}),pending=new Map();let seq=0;
+w.onmessage=({data})=>{const p=pending.get(data.id);if(!p)return;pending.delete(data.id);data.error?p.reject(Error(data.error)):p.resolve(data.result);};
+const call=(method,args={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});w.postMessage({id,method,args});});
+document.querySelector('#run').onclick=async()=>{out.textContent='Running actual IndexedDB and worker tests…';try{
+ const fixture=await(await fetch('./test-bundle.json')).blob();
+ const imported=await call('importArchive',{file:new File([fixture],'fixture.json')});check(imported.events===9,'signed fixture archive imported');
+ const list=await call('list',{refresh:true});check(list.rows.some(s=>s.id.endsWith(':stars'))&&list.rows.some(s=>s.id.endsWith(':serial'))&&list.rows.every(s=>!s.id.includes('campaign'))&&list.excluded===6,'all six campaign sites excluded; two useful sites visible');
+ const search=await call('list',{query:'Saturn'});check(search.total===1,'untitled publication searchable by archived page text');
+ const site=search.rows[0].id,detail=await call('detail',{site});check(detail.history.length===2&&detail.files.every(f=>f.verified),'version history and file verification preserved');
+ const changes=await call('compare',{site,before:detail.history[1].id,after:detail.history[0].id});check(changes.length===2&&changes.some(c=>c.status==='added')&&changes.some(c=>c.status==='changed'),'native path comparison detects changed and added files');
+ const restored=await call('restore',{site,version:detail.version.id});check(restored.blob.size>100,'verified ZIP restoration produced bytes');
+ const backup=await call('exportArchive'),expectedEvents=JSON.parse(await backup.blob.text()).stores.events.length;const clean=await engine.openArchive('roundtrip-regression-'+Date.now());
+ const importedAgain=await engine.importArchive(clean,backup.blob);check(importedAgain.events===expectedEvents,'full backup imports into independent fresh database');
+ for(const record of await clean.getAll('blobs'))check(engine.sha(await engine.readBlob(clean,record.id))===record.id,'restored file native hash '+record.id.slice(0,8));
+ const bad=JSON.parse(await backup.blob.text());bad.stores.objects[0].data='YmFk';let rejected=false;
+ try{await engine.importArchive(clean,new Blob([JSON.stringify(bad)]));}catch{rejected=true;}check(rejected,'corrupt backup rejected before commit');check((await clean.getAll('events')).length===expectedEvents,'failed import leaves existing archive intact');clean.close();
+ const valid=await(await fetch('./test-events.json')).json();valid[0].content='altered';const invalid=await call('importEvents',{file:new File([JSON.stringify(valid)],'invalid.json')});check(invalid.rejected===1&&invalid.accepted===0,'invalid signed event rejected');
+ const good=await call('importEvents',{file:new File([JSON.stringify((await(await fetch('./test-events.json')).json())[0],null,2)],'valid.json')});check(good.accepted===1,'single formatted signed event import supported');
+ const collection=new Worker('../collect-worker.js',{type:'module'});const done=await new Promise((resolve,reject)=>{collection.onmessage=({data})=>{if(data.type==='done')resolve(data);if(data.type==='error')reject(Error(data.message));};collection.onerror=e=>reject(Error(e.message));collection.postMessage({type:'collect',options:{relays:[],targets:[],servers:[],proxy:'',maxBytes:100000,maxBlobBytes:100000,maxFiles:4,maxQueries:1}});});collection.terminate();check(done.discovery.events===0,'collection worker completes bounded local pending-job retry');
+ out.textContent+='\nALL CHECKS PASSED';
+}catch(e){out.textContent+='\nFAIL '+e.stack;}};
+</script>
