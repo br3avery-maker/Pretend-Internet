@@ -24,4 +24,10 @@ assert 'data.put("id",a.id)' in java, 'Native catalog must emit app id'
 assert 'entries=list.map(x=>({name:x.id,' in embedded_scripts[0], 'Native app id lost in JS mapping'
 assert 'window.AndroidLauncher.launchApp(app.name)' in embedded_scripts[0], 'JS must pass app id to native bridge'
 assert 'apps.get(id)' in java, 'Native bridge must resolve app id'
-print('PASS: manifest, SAF, ZIP, per-app origins, file chooser, UI sync, JS fixture and native ID bridge')
+# Native isolation, folder-scoped origins and bounded ZIP work are shipped behavior.
+for expr in ['folderToken()','isFrameDestination','drainBounded','MAX_ZIP_TOTAL_BYTES','folderReady']:
+    assert expr in java,expr
+assert 'data-fallback' in embedded_scripts[0] or 'data-fallback' in (root/'web2app/index.html').read_text(), 'Native shell must hide fallback-only controls'
+assert 'id="help"' in (root/'web2app/index.html').read_text(), 'Ordinary in-app Help control is required'
+assert 'id="emptyChoose"' in (root/'web2app/index.html').read_text(), 'Empty state must offer the first action'
+print('PASS: manifest, SAF, ZIP bounds, per-app origins, folder identity, file chooser, Help, empty state, UI sync, JS fixture and native ID bridge')

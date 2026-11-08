@@ -1,11 +1,12 @@
 from pathlib import Path
 import base64
 import json
+import os
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parent.parent
 html=(root/'web2app/index.html').read_text()
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True, executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])
+    browser=p.chromium.launch(headless=True, executable_path=os.environ.get('CHROMIUM','/usr/bin/chromium'),args=['--no-sandbox','--disable-dev-shm-usage'])
     page=browser.new_page(viewport={'width':390,'height':844},device_scale_factor=1)
     failures=[]
     page.on('pageerror',lambda x:failures.append(str(x)))

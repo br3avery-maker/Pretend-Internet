@@ -1,5 +1,5 @@
 from pathlib import Path
-import io, zipfile, base64
+import io, zipfile, base64, os
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parent.parent/'web2app'
 s=root.joinpath('index.html').read_text()
@@ -14,7 +14,7 @@ def make_zip():
         z.writestr('site/icon.svg','<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="purple"/></svg>')
     return base64.b64encode(buf.getvalue()).decode()
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage'])
+    browser=p.chromium.launch(headless=True,executable_path=os.environ.get('CHROMIUM','/usr/bin/chromium'),args=['--no-sandbox','--disable-dev-shm-usage'])
     page=browser.new_page(viewport={'width':390,'height':844})
     page.set_content('<iframe id="appframe" sandbox="allow-scripts allow-same-origin"></iframe>')
     payload=make_zip()

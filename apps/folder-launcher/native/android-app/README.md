@@ -6,4 +6,8 @@ Use Android Studio (JDK 17, Gradle 8.9, AGP 8.7.3, SDK 35). Open this `android-a
 
 Once installed: gear -> Choose folder -> Android system picker -> Use this folder. Drop root-level HTML + optional matching image, or ZIP containing an HTML site, into that folder. Refresh / reopen the launcher to see apps. ZIPs are streamed via `ZipInputStream` on demand; there is no persistent extraction.
 
-Separate app WebViews use per-app virtual HTTPS origins and cannot call the trusted shell's native JavaScript bridge. Storage persists per app. The WebView supports user-initiated file `<input>` pickers. Native APK build and device testing have not yet been performed in this environment.
+Separate app WebViews use per-app virtual HTTPS origins, scoped by the chosen folder, and cannot call the trusted shell's native JavaScript bridge. Storage persists per app. A loose app's origin only executes its own entry HTML; other HTML pages are refused so apps cannot frame one another. The WebView supports user-initiated file `<input>` pickers.
+
+**Build status:** a clean `gradle clean :app:assembleDebug` succeeds with JDK 17.0.21+9, Gradle 8.9, AGP 8.7.3 and SDK 35. Verified debug APK SHA-256: `05a5ffa8d718d953c6f041da776ebd7af73bf15330161d3a1223a5c4153200e2`. It is signed with the Android Debug certificate via APK Signature Scheme v2 and declares only `INTERNET`.
+
+**Device testing has not been performed.** No Android device or usable emulator was available, so installation, SAF persistence after restart/reboot, ZIP runtime, per-app storage, Android Back navigation, rotation and update signing remain unverified. The parent [README](../README.md) lists the required device checks.

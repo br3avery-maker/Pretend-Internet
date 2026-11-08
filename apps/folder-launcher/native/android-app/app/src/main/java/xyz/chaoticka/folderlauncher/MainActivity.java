@@ -22,6 +22,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +48,7 @@ public final class MainActivity extends Activity {
     private static final String APP_SUFFIX=".apps.folderlauncher.invalid";
     private static final String STORE="folder_launcher", URI_KEY="tree_uri";
     private static final int MAX_ZIP_ENTRIES=4000, MAX_ENTRY_BYTES=32*1024*1024;
+    private static final long MAX_ZIP_TOTAL_BYTES=128L*1024*1024;
     private final Object fileLock=new Object();
     private final Map<String,Uri> files=new HashMap<>();
     private final List<FileEntry> roots=new ArrayList<>();
@@ -62,8 +64,8 @@ public final class MainActivity extends Activity {
         FileEntry(String n,String p,Uri u){name=n;path=p;uri=u;}
     }
     static final class AppEntry {
-        final String id,label,url,iconUrl,host;
-        AppEntry(String i,String l,String u,String icon,String h){id=i;label=l;url=u;iconUrl=icon;host=h;}
+        final String id,label,url,iconUrl,host,archive,entry;
+        AppEntry(String i,String l,String u,String icon,String h,String a,String e){id=i;label=l;url=u;iconUrl=icon;host=h;archive=a;entry=e;}
     }
     static final class ZipInfo {
         String html,icon;
@@ -79,6 +81,8 @@ public final class MainActivity extends Activity {
         SharedPreferences preferences=getSharedPreferences(STORE,MODE_PRIVATE);
         String remembered=preferences.getString(URI_KEY,null);
         if(remembered!=null){try{tree=Uri.parse(remembered);}catch(Exception ignored){}}
+        // A remembered URI is only usable if Android still holds the persisted read grant.
+        if(tree!=null&&!hasPersistedRead(tree)){tree=null;preferences.edit().remove(URI_KEY).apply();}
         home=newWebView(true);
         home.addJavascriptInterface(new Bridge(),"AndroidLauncher");
         root.addView(home,new FrameLayout.LayoutParams(-1,-1));
@@ -119,12 +123,18 @@ public final class MainActivity extends Activity {
                     String path=u.getPath();
                     if(path==null||!path.startsWith("/")||!safePath(path.substring(1)))return notFound();
                     String relative=path.substring(1);
-                    if(app.id.startsWith("zip:")){
-                        Uri archive; synchronized(fileLock){archive=files.get(app.id.substring(4));}
+                    if(app.archive!=null){
+                        Uri archive; synchronized(fileLock){archive=files.get(app.archive);}
                         if(archive==null)return notFound();
                         byte[] data=readZipEntry(archive,relative);
                         return data==null?notFound():new WebResourceResponse(mime(relative),charset(relative),new ByteArrayInputStream(data));
                     }
+                    // A loose app's origin may only execute its own page. Other HTML pages in the
+                    // folder stay unreachable, so one app cannot frame another app's page and read
+                    // its localStorage/IndexedDB. Non-HTML assets remain available for relative URLs;
+                    // active XML/SVG documents are refused when framed rather than loaded as images.
+                    if(isHtmlPath(relative)&&!relative.equals(app.entry))return notFound();
+                    if(!relative.equals(app.entry)&&isActiveFramePath(relative)&&isFrameDestination(req))return notFound();
                     Uri source; synchronized(fileLock){source=files.get(relative);}
                     if(source==null)return notFound();
                     try{InputStream in=getContentResolver().openInputStream(source);
@@ -145,7 +155,8 @@ public final class MainActivity extends Activity {
                     }catch(Exception ignored){return notFound();}
                 }
                 if(path.startsWith("/zip/")){
-                    String rest=path.substring(5),separator=rest.indexOf('/');
+                    String rest=path.substring(5);
+                    int separator=rest.indexOf('/');
                     if(separator<1)return notFound();
                     String archive=rest.substring(0,separator),entry=rest.substring(separator+1);
                     if(!safePath(archive)||archive.contains("/")||!safePath(entry)||!"zip".equals(ext(archive)))return notFound();
@@ -213,6 +224,34 @@ public final class MainActivity extends Activity {
             return out+APP_SUFFIX;
         }catch(Exception ignored){return "a"+Integer.toHexString(appId.hashCode())+APP_SUFFIX;}
     }
+    private String folderToken(){
+        if(tree==null)return "none";
+        try{
+            byte[] digest=MessageDigest.getInstance("SHA-256").digest(tree.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder out=new StringBuilder();
+            for(int i=0;i<8;i++)out.append(String.format(Locale.ROOT,"%02x",digest[i]&0xff));
+            return out.toString();
+        }catch(Exception ignored){return Integer.toHexString(tree.toString().hashCode());}
+    }
+    private boolean hasPersistedRead(Uri uri){
+        try{for(android.content.UriPermission permission:getContentResolver().getPersistedUriPermissions())
+            if(permission.isReadPermission()&&uri.equals(permission.getUri()))return true;
+        }catch(Exception ignored){}
+        return false;
+    }
+    static boolean isHtmlPath(String path){String e=ext(path);return e.equals("html")||e.equals("htm");}
+    static boolean isActiveFramePath(String path){
+        String e=ext(path);
+        return isHtmlPath(path)||e.equals("svg")||e.equals("xml")||e.equals("xhtml")||e.equals("mhtml");
+    }
+    static boolean isFrameDestination(WebResourceRequest request){
+        for(Map.Entry<String,String> header:request.getRequestHeaders().entrySet()){
+            if(!"Sec-Fetch-Dest".equalsIgnoreCase(header.getKey()))continue;
+            String destination=header.getValue()==null?"":header.getValue().toLowerCase(Locale.ROOT);
+            return destination.equals("document")||destination.equals("iframe")||destination.equals("frame")||destination.equals("embed")||destination.equals("object");
+        }
+        return request.isForMainFrame();
+    }
 
     private void scan(){
         List<FileEntry> fresh=new ArrayList<>();
@@ -246,13 +285,20 @@ public final class MainActivity extends Activity {
         try(InputStream input=getContentResolver().openInputStream(zip)){
             if(input==null)return null;
             try(ZipInputStream stream=new ZipInputStream(input)){
-                ZipEntry z;int count=0;
-                while((z=stream.getNextEntry())!=null&&++count<=MAX_ZIP_ENTRIES){
+                ZipEntry z;int count=0;long total=0;
+                while((z=stream.getNextEntry())!=null){
+                    if(++count>MAX_ZIP_ENTRIES)return null;
                     String n=z.getName();
-                    if(z.isDirectory()||!safePath(n))continue;
-                    String suffix=ext(n);
-                    if("html".equals(suffix)||"htm".equals(suffix))html.add(n);
-                    if(iconRank(n)<999)images.add(n);
+                    if(!z.isDirectory()&&safePath(n)){
+                        String suffix=ext(n);
+                        if("html".equals(suffix)||"htm".equals(suffix))html.add(n);
+                        if(iconRank(n)<999)images.add(n);
+                    }
+                    // ZipInputStream drains the current member when advancing. Bound that work so
+                    // a highly compressed member cannot inflate without limit during refresh.
+                    long drained=drainBounded(stream,Math.min(MAX_ENTRY_BYTES,MAX_ZIP_TOTAL_BYTES-total));
+                    if(drained<0)return null;
+                    total+=drained;
                 }
             }
         }catch(Exception ignored){return null;}
@@ -279,10 +325,15 @@ public final class MainActivity extends Activity {
         try(InputStream input=getContentResolver().openInputStream(archive)){
             if(input==null)return null;
             try(ZipInputStream zip=new ZipInputStream(input)){
-                ZipEntry entry;int count=0;
+                ZipEntry entry;int count=0;long total=0;
                 byte[] buffer=new byte[16384];
-                while((entry=zip.getNextEntry())!=null&&++count<=MAX_ZIP_ENTRIES){
-                    if(entry.isDirectory()||!safePath(entry.getName())||!entry.getName().equals(wanted))continue;
+                while((entry=zip.getNextEntry())!=null){
+                    if(++count>MAX_ZIP_ENTRIES)return null;
+                    if(entry.isDirectory()||!safePath(entry.getName())||!entry.getName().equals(wanted)){
+                        long drained=drainBounded(zip,Math.min(MAX_ENTRY_BYTES,MAX_ZIP_TOTAL_BYTES-total));
+                        if(drained<0)return null;
+                        total+=drained;continue;
+                    }
                     if(entry.getSize()>MAX_ENTRY_BYTES)return null;
                     ByteArrayOutputStream bytes=new ByteArrayOutputStream();
                     int read;
@@ -293,10 +344,19 @@ public final class MainActivity extends Activity {
         }catch(Exception ignored){}
         return null;
     }
+    private static long drainBounded(InputStream stream,long limit)throws IOException{
+        byte[] buffer=new byte[16384];long total=0;int read;
+        while((read=stream.read(buffer))!=-1){
+            total+=read;
+            if(total>limit)return -1;
+        }
+        return total;
+    }
     private String catalog(){
         scan();
         List<FileEntry> listing;
         synchronized(fileLock){listing=new ArrayList<>(roots);}
+        String source=folderToken();
         Map<String,FileEntry> icons=new HashMap<>();
         for(FileEntry file:listing)if(iconRank(file.name)<999){
             String key=stem(file.name);
@@ -308,15 +368,15 @@ public final class MainActivity extends Activity {
             String extension=ext(file.name);
             if(extension.equals("html")||extension.equals("htm")){
                 FileEntry icon=icons.get(stem(file.name));
-                String id="loose:"+file.name,host=appHost(id);
-                found.add(new AppEntry(id,label(file.name),"https://"+host+"/"+pathUrl(file.path),icon==null?"":ORIGIN+"/files/"+pathUrl(icon.path),host));
+                String id="loose:"+source+":"+file.name,host=appHost(id);
+                found.add(new AppEntry(id,label(file.name),"https://"+host+"/"+pathUrl(file.path),icon==null?"":ORIGIN+"/files/"+pathUrl(icon.path),host,null,file.path));
             }else if(extension.equals("zip")){
                 ZipInfo zip=inspectZip(file.uri);
                 if(zip==null)continue;
                 FileEntry icon=icons.get(stem(file.name));
                 String base=ORIGIN+"/zip/"+Uri.encode(file.name)+"/";
-                String id="zip:"+file.name,host=appHost(id);
-                found.add(new AppEntry(id,label(file.name),"https://"+host+"/"+pathUrl(zip.html),icon!=null?ORIGIN+"/files/"+pathUrl(icon.path):zip.icon!=null?base+pathUrl(zip.icon):"",host));
+                String id="zip:"+source+":"+file.name,host=appHost(id);
+                found.add(new AppEntry(id,label(file.name),"https://"+host+"/"+pathUrl(zip.html),icon!=null?ORIGIN+"/files/"+pathUrl(icon.path):zip.icon!=null?base+pathUrl(zip.icon):"",host,file.name,zip.html));
             }
         }
         found.sort(Comparator.comparing((AppEntry a)->a.label.toLowerCase(Locale.ROOT)).thenComparing(a->a.id));
@@ -330,6 +390,7 @@ public final class MainActivity extends Activity {
     private final class Bridge{
         @JavascriptInterface public String listApps(){return catalog();}
         @JavascriptInterface public String folderName(){return tree==null?"No folder selected":"Connected Android folder";}
+        @JavascriptInterface public boolean folderReady(){return tree!=null&&hasPersistedRead(tree);}
         @JavascriptInterface public void chooseFolder(){runOnUiThread(()->{
             Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
