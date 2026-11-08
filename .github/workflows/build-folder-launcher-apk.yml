@@ -46,6 +46,9 @@ jobs:
           gradle-version: '8.9'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # The action's default includes the retired SDK package 'tools'.
+          packages: 'platform-tools'
 
       - name: Install the Android SDK required by this project
         shell: bash
