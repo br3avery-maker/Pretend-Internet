@@ -1,0 +1,105 @@
+name: Build Folder Launcher APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/folder-launcher/native/android-app/**'
+      - '.github/workflows/build-folder-launcher-apk.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: folder-launcher-apk-main
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether the recorded APK already matches this source tree
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(git rev-parse HEAD:apps/folder-launcher/native/android-app)"
+          if [[ -f artifacts/folder-launcher/SOURCE_TREE.txt ]] && [[ "$(cat artifacts/folder-launcher/SOURCE_TREE.txt)" == "$tree" ]]; then
+            echo "needs_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install the Android SDK required by this project
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Clean build
+        working-directory: apps/folder-launcher/native/android-app
+        run: gradle clean :app:assembleDebug --no-daemon
+
+      - name: Verify and stage the installable testing APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="apps/folder-launcher/native/android-app/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
+            grep -F "package: name='xyz.chaoticka.folderlauncher'"
+          mkdir -p artifacts/folder-launcher
+          cp "$apk" artifacts/folder-launcher/FolderLauncher.apk
+          (
+            cd artifacts/folder-launcher
+            sha256sum FolderLauncher.apk > CHECKSUMS.txt
+            sha512sum FolderLauncher.apk >> CHECKSUMS.txt
+          )
+          printf '%s\n' "${{ steps.source.outputs.tree }}" > artifacts/folder-launcher/SOURCE_TREE.txt
+          cat artifacts/folder-launcher/CHECKSUMS.txt
+
+      - name: Keep a downloadable Actions copy even if repository publishing fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: FolderLauncher-Android-APK
+          path: |
+            artifacts/folder-launcher/FolderLauncher.apk
+            artifacts/folder-launcher/CHECKSUMS.txt
+            artifacts/folder-launcher/SOURCE_TREE.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit the verified APK and checksums to this repository
+        if: steps.source.outputs.needs_publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # This requested testing APK is a deliberate exception to the
+          # repository's default ignore rules for generated binaries.
+          git add -f artifacts/folder-launcher/FolderLauncher.apk \
+            artifacts/folder-launcher/CHECKSUMS.txt \
+            artifacts/folder-launcher/SOURCE_TREE.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "build(folder-launcher): store test APK and checksums [skip ci]"
+            git push origin HEAD:main
+          fi
