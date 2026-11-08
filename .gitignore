@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+.gradle/
+artifacts/
 coverage/
 .cache/
 __pycache__/
