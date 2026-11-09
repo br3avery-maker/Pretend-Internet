@@ -19,6 +19,8 @@ jobs:
             [ -f "$f" ] || continue
             python3 scripts/validate-mini-app.py "$(dirname "$f")"
           done
+      - name: Verify mini-app validator diagnostics
+        run: python3 scripts/test_validate_mini_app.py
       - name: Verify shell-only build
         run: |
           sh scripts/build-frontend.sh

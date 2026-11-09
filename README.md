@@ -32,7 +32,7 @@ To validate on a regular computer with npm: `npm ci && npm run build && npm run 
 
 Open `templates/mini-app/index.html` directly for the standalone example. No backend or network is needed.
 
-To make a new app, copy the template into `apps/<app-id>/`, replace its actual functionality, identity and visible Help, and validate metadata with `python3 scripts/validate-mini-app.py apps/<app-id>`. This only checks metadata and file paths, not runtime or APK operation.
+To make a new app, copy the template into `apps/<app-id>/`, set `app.json.id` to the same directory name, replace its actual functionality and visible Help, and validate metadata with `python3 scripts/validate-mini-app.py apps/<app-id>`. This only checks metadata and file paths, not runtime or APK operation.
 
 Nothing in this repository automatically imports, archives, or deletes ChatGPT Library files.
 

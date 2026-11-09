@@ -25,10 +25,14 @@ def validate(folder):
             return ""
         return x
     if obj.get("schemaVersion") != "0.1": errors.append("schemaVersion must be 0.1")
-    if not ID.fullmatch(required_text("id")): errors.append("id must be lowercase kebab-case")
+    app_id = required_text("id")
+    if not ID.fullmatch(app_id): errors.append("id must be lowercase kebab-case")
+    if folder.parent.name == "apps" and app_id and app_id != folder.name:
+        errors.append("id must match app directory name '" + folder.name + "'")
     required_text("name")
     if not VERSION.fullmatch(required_text("version")): errors.append("version must be X.Y.Z")
-    if obj.get("status") not in STATUS: errors.append("invalid status")
+    status = obj.get("status")
+    if not isinstance(status, str) or status not in STATUS: errors.append("invalid status")
     required_text("summary")
     entry = required_text("entry")
     if entry:
