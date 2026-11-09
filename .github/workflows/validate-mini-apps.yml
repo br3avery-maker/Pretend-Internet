@@ -25,6 +25,8 @@ jobs:
         run: |
           sh scripts/build-frontend.sh
           sh scripts/check-frontend.sh
+      - name: Verify frontend build replaces stale dist output
+        run: sh scripts/test_frontend_build.sh
       - name: Verify on-device npm build command
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
