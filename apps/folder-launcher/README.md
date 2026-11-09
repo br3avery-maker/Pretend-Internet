@@ -2,7 +2,7 @@
 
 An offline-first, empty Android icon launcher that discovers standalone HTML pages and packaged ZIP websites from one chosen phone folder. No account, registry, network catalog, or APK rebuild when you add an app.
 
-**Status: testing — APK built, not device-verified.** The debug APK builds cleanly and the source/browser tests pass. No Android device or usable emulator was available in the build environment, so installation, SAF persistence, Back behavior and per-app storage are not yet verified on hardware. Do not mark this `live`.
+**Status: testing — APK built and partially user-observed on Android.** The debug APK builds cleanly and the source/browser tests pass. On 2026-11-08 the owner supplied Android screenshots showing a populated four-column launcher grid with five app entries and a bottom-right settings gear matching the shipped shell source, and confirmed that Deepink is one of the apps opened from it. This verifies observed phone UI and an app-opening path, **not** exact installed APK identity, clean-install state, or full behavior. Continue to distinguish user-observed screenshots from on-device instrumentation and untested functions; do not mark this `live`.
 
 ## What to drop in the folder
 
@@ -80,11 +80,11 @@ Android Studio: open `native/android-app` (or `android-app` inside the Android s
 - Repository `npm ci && npm run build && npm run check`: pass.
 - Packaged APK contains `assets/index.html`, `classes.dex` and the `AndroidManifest.xml` with launchable `MainActivity`.
 
-**Not verified:** no Android device or emulator was available (`adb devices` was empty; `/dev/kvm` was not accessible). Installation, SAF grant persistence after force-stop/reboot, icon and nested-asset rendering, ZIP runtime, per-app storage isolation, Android Back navigation, rotation/process death, file-chooser behavior and update signing have **not** been tested on a device.
+**Device evidence, 2026-11-08:** although no Android device or emulator was available in the *authoring build environment* (`adb devices` was empty; `/dev/kvm` was not accessible), the owner later supplied an Android screenshot of the populated launcher with five entries and settings gear, and reported opening a listed app (Deepink). The layout matches this version's source. The screenshot does **not** prove which APK hash/package version was installed. **Still not device-verified:** clean-install empty state, SAF permission persistence through force-stop/reboot, ZIP runtime and nested assets, per-app storage isolation, full Android Back/history behavior, rotation/process death, file chooser, malformed archives and update signing. The app remains `testing`.
 
 ## Device verification still required
 
-1. Install the debug APK on an Android 8.0+ phone (`adb install -r FolderLauncher-0.2.0-debug.apk` or a file manager) and confirm package `xyz.chaoticka.folderlauncher` version 0.2.0 launches.
+1. Confirm the **exact** installed package `xyz.chaoticka.folderlauncher`, version 0.2.0, and the tested APK identity (the owner-provided screenshot already shows launcher rendering, but not the package metadata or binary fingerprint). For a fresh installation, also verify the empty state.
 2. Choose a folder once; confirm the system picker grants read access with no broad storage permission prompt. Force-stop, restart and reboot the phone, then confirm the same folder is still readable.
 3. Add `foo.html` plus optional `foo.png`, and a `bar.zip` with root or nested `index.html`, CSS, JS and images. Confirm both tiles appear after refresh, icons match, nested assets load and the ZIP is not permanently extracted.
 4. Replace and delete the HTML/ZIP; confirm refresh removes or updates apps without rebuilding the APK. Test corrupt, encrypted and oversized ZIPs for graceful failure.
@@ -102,7 +102,7 @@ The owner requested an intentionally **checked-in testing APK**, as an exception
 - [`artifacts/folder-launcher/CHECKSUMS.txt`](../../artifacts/folder-launcher/CHECKSUMS.txt)
 - `artifacts/folder-launcher/SOURCE_TREE.txt` — the source-tree identity used to avoid rewriting an unchanged build
 
-**These files are produced by GitHub Actions after the workflow first runs successfully.** The historical SHA-256 recorded earlier in this README is for the original agent-built APK, not a promise that a fresh CI build has the same bytes. Validate downloaded APKs against the `CHECKSUMS.txt` beside that specific APK.
+**Verified:** GitHub Actions [run 42533397460](https://github.com/br3avery-maker/Pretend-Internet/actions/runs/42533397460) succeeded; [bot commit `9b5494b`](https://github.com/br3avery-maker/Pretend-Internet/commit/9b5494b8d3ac101b1e2f38657fdaf560881e5d14) contains the APK and checksums. The committed APK SHA-256 `0592b8da2faa07dd8e32964fdd3667d784782a847bc3ba6d36324c41f1b30dfa` was independently matched to the committed checksum.** The historical SHA-256 recorded earlier in this README is for the original agent-built APK, not a promise that a fresh CI build has the same bytes. Validate downloaded APKs against the `CHECKSUMS.txt` beside that specific APK.
 
 The workflow currently creates a **debug-signed testing APK**. Its signing certificate is generated by the build environment, so later rebuilds using a different debug key might **not** install over an existing installation. To preserve app data across upgrades, provision one private, stable signing key through GitHub Actions secrets or another secured signing workflow **before** treating these testing builds as upgradeable releases. Never commit a production signing key to this public repository. The source-tree check avoids needlessly replacing the repository APK when only the workflow is rerun without source changes.
 
