@@ -12,6 +12,9 @@ __pycache__/
 *.aab
 *.keystore
 *.jks
+# Folder Launcher release signing: private key and credentials stay local.
+apps/folder-launcher/native/android-app/.signing/
+apps/folder-launcher/native/android-app/keystore.properties
 *.log
 .env
 .env.*
