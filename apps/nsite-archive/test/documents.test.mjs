@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const documents={index:'library',publishers:'publishers',site:'site',history:'history',compare:'compare',page:'page',collect:'collect',backup:'backup',help:'help'};
 test('nine separately loadable HTML documents have independent controllers and ordinary links',()=>{
@@ -13,4 +13,24 @@ test('nine separately loadable HTML documents have independent controllers and o
 test('all page controllers navigate documents rather than swapping routes',()=>{
  for(const file of fs.readdirSync(path.join(root,'pages'))){const code=fs.readFileSync(path.join(root,'pages',file),'utf8');assert(!code.includes('location.hash='));assert(!code.includes('renderers='));assert(!code.includes("href=\"#/"));}
  const cache=fs.readFileSync(path.join(root,'sw.js'),'utf8');assert(cache.includes('ignoreSearch:true'),'offline document requests retain query parameters');
+});
+test('build cleanly replaces dist and contains exactly the current runtime assets',()=>{
+ const dist=path.join(root,'dist');
+ const build=()=>execFileSync('sh',['build.sh'],{cwd:root,stdio:'pipe'});
+ fs.rmSync(dist,{recursive:true,force:true});fs.mkdirSync(dist,{recursive:true});
+ fs.writeFileSync(path.join(dist,'old-build-only.txt'),'obsolete\n');build();
+ assert.equal(fs.existsSync(path.join(dist,'old-build-only.txt')),false,'first build removed a stale file');
+ fs.writeFileSync(path.join(dist,'second-build-only.txt'),'obsolete\n');build();
+ assert.equal(fs.existsSync(path.join(dist,'second-build-only.txt')),false,'repeated build removed a stale file');
+ const expected=new Set([
+  ...Object.keys(documents).map(name=>`${name}.html`),
+  'ui.js','archive-client.js','collection.js','storage.js','style.css','model.js','archive-worker.js','collect-worker.js','sw.js',
+  ...fs.readdirSync(path.join(root,'pages')).filter(name=>name.endsWith('.js')).map(name=>`pages/${name}`),
+  'vendor/archive-engine.js','vendor/collector-engine.js'
+ ]);
+ const actual=[];
+ const walk=(dir,prefix='')=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const name=prefix?`${prefix}/${entry.name}`:entry.name;if(entry.isDirectory())walk(path.join(dir,entry.name),name);else actual.push(name);}};
+ walk(dist);
+ for(const file of expected)assert(fs.existsSync(path.join(dist,file)),`missing ${file}`);
+ assert.deepEqual(actual.sort(),[...expected].sort());assert.equal(fs.existsSync(path.join(dist,'app.js')),false);
 });
