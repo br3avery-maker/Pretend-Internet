@@ -2,7 +2,7 @@
 
 An offline-first, empty Android icon launcher that discovers standalone HTML pages and packaged ZIP websites from one chosen phone folder. No account, registry, network catalog, or APK rebuild when you add an app.
 
-**Status: testing — APK built and partially user-observed on Android.** The debug APK builds cleanly and the source/browser tests pass. On 2026-11-08 the owner supplied Android screenshots showing a populated four-column launcher grid with five app entries and a bottom-right settings gear matching the shipped shell source, and confirmed that Deepink is one of the apps opened from it. This verifies observed phone UI and an app-opening path, **not** exact installed APK identity, clean-install state, or full behavior. Continue to distinguish user-observed screenshots from on-device instrumentation and untested functions; do not mark this `live`.
+**Status: live — owner-confirmed installed-device verification (2026-11-09).** The debug APK builds cleanly, the source/browser tests pass, and the owner confirmed that installed-device verification is complete, including the remaining [Issue #11](https://github.com/br3avery-maker/Pretend-Internet/issues/11) acceptance checks. On 2026-11-08 the owner supplied Android screenshots showing a populated four-column launcher grid with five app entries and a bottom-right settings gear matching the shipped shell source, and confirmed that Deepink is one of the apps opened from it. The 2026-11-09 confirmation is an owner attestation: no phone model, Android version, install receipt, or additional screenshots were supplied, and no independent device instrumentation was captured. The tested repository APK is recorded below.
 
 ## What to drop in the folder
 
@@ -45,7 +45,7 @@ A generic Web2App HTML-to-APK converter cannot be made to scan a chosen Android 
 
 ## Build the native APK
 
-Verified from a clean tree in this workspace on 2026-11-08 with JDK 17.0.21+9 (Temurin), Gradle 8.9, Android Gradle Plugin 8.7.3, Android SDK Platform 35 and Build-Tools 35.0.0.
+Verified from a clean tree on 2026-11-08 and rebuilt on 2026-11-09 with JDK 17.0.21+9 (Temurin), Gradle 8.9, Android Gradle Plugin 8.7.3, Android SDK Platform 35 and Build-Tools 35.0.0.
 
 Install `platforms;android-35`, `build-tools;35.0.0` and `platform-tools` with `sdkmanager`, then:
 
@@ -56,7 +56,7 @@ cd apps/folder-launcher/native/android-app
 gradle clean :app:assembleDebug --no-daemon
 ```
 
-Output: `app/build/outputs/apk/debug/app-debug.apk`. The verified artifact is 33 KiB with SHA-256 `05a5ffa8d718d953c6f041da776ebd7af73bf15330161d3a1223a5c4153200e2` (also delivered as `FolderLauncher-0.2.0-debug.apk` outside source control). Package `xyz.chaoticka.folderlauncher`, versionCode 2 / versionName 0.2.0, minSdk 26, targetSdk 35, only the `INTERNET` permission. APK Signature Scheme v2, Android Debug certificate SHA-256 `68946a354f6db9e25c5a8929513fcd033ac8a28f78b139374210de9fc4f5b885`.
+Output: `app/build/outputs/apk/debug/app-debug.apk`. The original verified workspace build is 32,780 bytes with SHA-256 `05a5ffa8d718d953c6f041da776ebd7af73bf15330161d3a1223a5c4153200e2` (also delivered as `FolderLauncher-0.2.0-debug.apk` outside source control). The repository's checked-in CI build is recorded below. Package `xyz.chaoticka.folderlauncher`, versionCode 2 / versionName 0.2.0, minSdk 26, targetSdk 35, only the `INTERNET` permission. APK Signature Scheme v2, Android Debug certificate SHA-256 `68946a354f6db9e25c5a8929513fcd033ac8a28f78b139374210de9fc4f5b885`.
 
 Android Studio: open `native/android-app` (or `android-app` inside the Android source ZIP), sync, and choose **Build > Build APK(s)**. Allow it to install missing SDK packages. No manifest edits are required.
 
@@ -80,19 +80,11 @@ Android Studio: open `native/android-app` (or `android-app` inside the Android s
 - Repository `npm ci && npm run build && npm run check`: pass.
 - Packaged APK contains `assets/index.html`, `classes.dex` and the `AndroidManifest.xml` with launchable `MainActivity`.
 
-**Device evidence, 2026-11-08:** although no Android device or emulator was available in the *authoring build environment* (`adb devices` was empty; `/dev/kvm` was not accessible), the owner later supplied an Android screenshot of the populated launcher with five entries and settings gear, and reported opening a listed app (Deepink). The layout matches this version's source. The screenshot does **not** prove which APK hash/package version was installed. **Still not device-verified:** clean-install empty state, SAF permission persistence through force-stop/reboot, ZIP runtime and nested assets, per-app storage isolation, full Android Back/history behavior, rotation/process death, file chooser, malformed archives and update signing. The app remains `testing`.
+**Installed-device verification (owner-attested, 2026-11-09):** On 2026-11-09 the owner confirmed that installed-device verification is complete, including the remaining [Issue #11](https://github.com/br3avery-maker/Pretend-Internet/issues/11) acceptance checks: exact installed package/version identity, fresh-install empty state, SAF permission persistence through app restart and device reboot, HTML and ZIP launch with nested assets, per-app localStorage/IndexedDB isolation, Android Back/rotation/process-death behavior, the HTML file chooser, malformed/encrypted/oversized ZIP handling, and the Web2App fallback. This entry records the owner's attestation, not independently captured instrumentation. No phone model, Android version, install receipt, or additional screenshots were supplied for this confirmation; the 2026-11-08 screenshots remain the only captured device observation.
 
-## Device verification still required
+**Repository APK identity:** [`artifacts/folder-launcher/FolderLauncher.apk`](../../artifacts/folder-launcher/FolderLauncher.apk) is the checked-in CI-built debug APK: 32,784 bytes, SHA-256 `0592b8da2faa07dd8e32964fdd3667d784782a847bc3ba6d36324c41f1b30dfa`, SHA-512 `2d871e8aa8b407a901457d5376179aa649baf9cf636e019638df052070f9f96ea03c82bdd52bfa24e747fe5eeb96779d6c1894cde7aed50a4596124eabf26324`, package `xyz.chaoticka.folderlauncher`, versionCode 2 / versionName 0.2.0. A clean local build from this source also succeeds and produces SHA-256 `05a5ffa8d718d953c6f041da776ebd7af73bf15330161d3a1223a5c4153200e2`; debug builds from different environments are not required to be byte-identical.
 
-1. Confirm the **exact** installed package `xyz.chaoticka.folderlauncher`, version 0.2.0, and the tested APK identity (the owner-provided screenshot already shows launcher rendering, but not the package metadata or binary fingerprint). For a fresh installation, also verify the empty state.
-2. Choose a folder once; confirm the system picker grants read access with no broad storage permission prompt. Force-stop, restart and reboot the phone, then confirm the same folder is still readable.
-3. Add `foo.html` plus optional `foo.png`, and a `bar.zip` with root or nested `index.html`, CSS, JS and images. Confirm both tiles appear after refresh, icons match, nested assets load and the ZIP is not permanently extracted.
-4. Replace and delete the HTML/ZIP; confirm refresh removes or updates apps without rebuilding the APK. Test corrupt, encrypted and oversized ZIPs for graceful failure.
-5. Open two apps that write localStorage/IndexedDB; confirm their data stays separate and survives returning home and reopening. Confirm a loose app cannot frame another app's page.
-6. Open an app, navigate inside it, and press Android Back; confirm it returns through app history to the icon grid, and that the grid remains usable.
-7. Test the HTML `<input type="file">` picker, screen rotation, background/foreground and process death.
-8. Record the phone model, Android version, install result and screenshots or a test receipt. Update the APK versionCode and sign with a stable key before distributing updates.
-9. If the Web2App HTML fallback is used, verify its import picker and exported APK separately from this native SAF build.
+**Distribution limitation:** the checked-in APK is debug-signed. Use one stable private keystore and raise `versionCode` before distributing updates; do not commit a signing key.
 
 ## GitHub-built APK stored in the repository
 
@@ -102,8 +94,8 @@ The owner requested an intentionally **checked-in testing APK**, as an exception
 - [`artifacts/folder-launcher/CHECKSUMS.txt`](../../artifacts/folder-launcher/CHECKSUMS.txt)
 - `artifacts/folder-launcher/SOURCE_TREE.txt` — the source-tree identity used to avoid rewriting an unchanged build
 
-**Verified:** GitHub Actions [run 42533397460](https://github.com/br3avery-maker/Pretend-Internet/actions/runs/42533397460) succeeded; [bot commit `9b5494b`](https://github.com/br3avery-maker/Pretend-Internet/commit/9b5494b8d3ac101b1e2f38657fdaf560881e5d14) contains the APK and checksums. The committed APK SHA-256 `0592b8da2faa07dd8e32964fdd3667d784782a847bc3ba6d36324c41f1b30dfa` was independently matched to the committed checksum.** The historical SHA-256 recorded earlier in this README is for the original agent-built APK, not a promise that a fresh CI build has the same bytes. Validate downloaded APKs against the `CHECKSUMS.txt` beside that specific APK.
+**Verified:** GitHub Actions [run 42533397460](https://github.com/br3avery-maker/Pretend-Internet/actions/runs/42533397460) succeeded; [bot commit `9b5494b`](https://github.com/br3avery-maker/Pretend-Internet/commit/9b5494b8d3ac101b1e2f38657fdaf560881e5d14) contains the APK and checksums. The committed APK SHA-256 `0592b8da2faa07dd8e32964fdd3667d784782a847bc3ba6d36324c41f1b30dfa` was independently matched to the committed checksum. The historical SHA-256 recorded earlier in this README is for the original agent-built APK, not a promise that a fresh CI build has the same bytes. Validate downloaded APKs against the `CHECKSUMS.txt` beside that specific APK.
 
 The workflow currently creates a **debug-signed testing APK**. Its signing certificate is generated by the build environment, so later rebuilds using a different debug key might **not** install over an existing installation. To preserve app data across upgrades, provision one private, stable signing key through GitHub Actions secrets or another secured signing workflow **before** treating these testing builds as upgradeable releases. Never commit a production signing key to this public repository. The source-tree check avoids needlessly replacing the repository APK when only the workflow is rerun without source changes.
 
-The workflow is build/distribution automation only: it does **not** establish installed-Android verification, does not change the app's `testing` status, and does not deploy or publish an nsite.
+The workflow is build/distribution automation only: it does **not** by itself establish installed-Android verification, and it does not deploy or publish an nsite. The installed-device status above comes from the owner's 2026-11-09 confirmation, not from this workflow.
