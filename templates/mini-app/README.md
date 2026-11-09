@@ -8,7 +8,7 @@ Open `index.html` in any modern browser. No build tool, package manager, network
 
 ## Start a real app
 
-1. Copy this directory into `apps/<app-id>/` and rename IDs, page title, manifest and docs.
+1. Copy this directory into `apps/<app-id>/`, set `app.json.id` to the same directory name, and rename the page title, manifest and docs.
 2. Replace example features with **actually implemented** features; update visible Help to describe what works, limitations, and data.
 3. Customize semantic colors/spacing in `skin.css`; do not move business logic into skin rules.
 4. Run `python3 scripts/validate-mini-app.py apps/<app-id>` from repository root.
