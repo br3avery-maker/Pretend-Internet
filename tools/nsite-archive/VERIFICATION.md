@@ -14,6 +14,14 @@ Host: Linux, Node 24.22.1, Playwright 1.56.1 / Chromium 141.0.7390.37. Fresh tem
 | Root `npm ci`, `npm run build`, `npm run check`, template metadata validator | **Passed**; launcher/Pocket Counter build remains unchanged. |
 | Strict Chromium OS sandbox in this cloud runtime | **Unavailable**: Chromium refuses this root runtime. Worker stores `browser-sandbox-unavailable`, never retries without sandbox or fabricates a preview. |
 
+## Preview-cache validation (2026-11-09)
+
+Source base `0e3d8fb` (`fix/nsite-preview-cache-recovery`).
+
+- `npm test` in `tools/nsite-archive`: **42 passed** on Node 26.13.0, including a new regression that deletes and alters a cached PNG. A complete row is no longer reported as cached; the PNG is regenerated, `Archive.export()` returns no preview while invalid, and `exportTo()` copies no invalid file.
+- CI runs the same suite plus the browser and strict-sandbox checks on Node 22; current PR results belong in the PR record.
+- Not verified here: real sandboxed Chromium capture and Android/device behavior. The new regression uses the existing fake Chromium harness; the strict-sandbox acceptance remains CI-only.
+
 ## CI acceptance
 
 `.github/workflows/nsite-archive.yml` installs pinned dependencies and Chromium on Ubuntu 22.04 / Node 22. It runs archive tests, the actual browser directory flow, and **`npm run test:sandbox`**. The latter requires a real sandboxed PNG, no requests to an external HTTP canary, and a cached second capture. It fails if the OS sandbox is unavailable; it cannot silently fall back to the trusted-viewer test's browser settings.

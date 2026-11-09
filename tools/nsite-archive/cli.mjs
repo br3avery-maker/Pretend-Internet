@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { Archive } from './archive.mjs';
 import { Network } from './network.mjs';
 import { Collector, DEFAULTS } from './collect.mjs';
-import { screenshot } from './preview.mjs';
+import { screenshot, previewPath } from './preview.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const help = `Nsite Archive — complete collection, shared bytes, separate signed history.
 
@@ -65,9 +65,11 @@ export function exportTo(archive, destination) {
   );
   fs.mkdirSync(path.join(destination, 'previews'));
   for (const row of archive.all("SELECT hash FROM previews WHERE status='complete'")) {
-    const source = path.join(archive.home, 'previews', row.hash + '.png');
-    if (fs.existsSync(source))
-      fs.copyFileSync(source, path.join(destination, 'previews', row.hash + '.png'));
+    if (!previewPath(archive, row.hash)) continue;
+    fs.copyFileSync(
+      path.join(archive.home, 'previews', row.hash + '.png'),
+      path.join(destination, 'previews', row.hash + '.png'),
+    );
   }
   return { directory: path.resolve(destination), stats: payload.stats };
 }

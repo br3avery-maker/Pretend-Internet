@@ -5,7 +5,7 @@ import { signedEvent, hex64 } from '../relay-router/validation.mjs';
 import { chunks, merkleFile, merkleDirectory, PROFILE } from './chunks.mjs';
 import { parseManifest, tags, first, sha, aggregate, gatewayURL, safePath } from './manifest.mjs';
 import { extractHTML, EXTRACTOR, mime } from './extract.mjs';
-import { PREVIEW_PROFILE } from './preview.mjs';
+import { PREVIEW_PROFILE, previewPath } from './preview.mjs';
 
 export const SCHEMA = 'nsite-archive.v1';
 const json = JSON.stringify;
@@ -521,8 +521,9 @@ export class Archive {
           } catch (e) {
             if (e.message !== 'storage-budget' && e.message !== 'file-directory-conflict') throw e;
           }
-        const previewKey = sha(json([v.aggregate, PREVIEW_PROFILE, 390, 844]));
-        const preview = this.one('SELECT * FROM previews WHERE key=?', previewKey);
+        const previewKey = sha(json([v.aggregate, PREVIEW_PROFILE, 390, 844])),
+          preview = this.one('SELECT * FROM previews WHERE key=?', previewKey),
+          previewFile = preview?.status === 'complete' ? previewPath(this, preview.hash) : null;
         return {
           id: v.id,
           created: v.created,
@@ -542,7 +543,7 @@ export class Archive {
           available: available.length,
           total: v.files.length,
           status: available.length === v.files.length ? 'complete' : 'partial',
-          preview: preview?.status === 'complete' ? `previews/${preview.hash}.png` : null,
+          preview: previewFile ? `previews/${preview.hash}.png` : null,
         };
       });
       return {
