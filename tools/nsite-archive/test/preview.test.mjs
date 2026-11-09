@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { Archive } from '../archive.mjs';
+import { exportTo } from '../cli.mjs';
 import { screenshot, PREVIEW_CSP } from '../preview.mjs';
 import { event, temp } from './fixtures.mjs';
 import { sha } from '../manifest.mjs';
@@ -71,6 +73,59 @@ test('preview worker requires OS sandbox, isolated context, script blocking and 
   assert.equal(result.status, 'complete');
   assert.ok(aborted && fulfilled && closed);
   assert.equal((await screenshot(a, a.snapshots()[0], { chromium })).status, 'cached');
+});
+test('cached previews are validated and recovered when the PNG is missing or altered', async (t) => {
+  const home = temp(),
+    a = new Archive(home);
+  t.after(() => {
+    a.close();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+  const html = '<h1>Visible</h1>';
+  a.ingest(event({ files: { '/index.html': html } }));
+  a.store(Buffer.from(html), sha(html));
+  const snapshot = a.snapshots()[0],
+    image = Buffer.from('stable-preview'),
+    chromium = {
+      launch: async () => ({
+        close: async () => {},
+        newContext: async () => ({
+          route: async () => {},
+          newPage: async () => ({
+            setDefaultTimeout() {},
+            goto: async () => {},
+            screenshot: async () => image,
+          }),
+        }),
+      }),
+    };
+  const first = await screenshot(a, snapshot, { chromium });
+  assert.equal(first.status, 'complete');
+  const file = path.join(home, 'previews', first.hash + '.png');
+  assert.equal(sha(fs.readFileSync(file)), first.hash);
+  assert.equal(a.export().sites[0].versions[0].preview, `previews/${first.hash}.png`);
+
+  fs.rmSync(file);
+  assert.equal(a.export().sites[0].versions[0].preview, null);
+  const second = await screenshot(a, snapshot, { chromium });
+  assert.equal(second.status, 'complete');
+  assert.equal(second.hash, first.hash);
+  assert.equal(sha(fs.readFileSync(file)), first.hash);
+  assert.equal(a.export().sites[0].versions[0].preview, `previews/${first.hash}.png`);
+
+  fs.writeFileSync(file, Buffer.from('altered-preview'));
+  assert.equal(a.export().sites[0].versions[0].preview, null);
+  const third = await screenshot(a, snapshot, { chromium });
+  assert.equal(third.status, 'complete');
+  assert.equal(sha(fs.readFileSync(file)), first.hash);
+  assert.equal(a.export().sites[0].versions[0].preview, `previews/${first.hash}.png`);
+
+  fs.writeFileSync(file, Buffer.from('altered-preview'));
+  const output = path.join(home, 'export');
+  exportTo(a, output);
+  const directory = JSON.parse(fs.readFileSync(path.join(output, 'directory.json'), 'utf8'));
+  assert.equal(directory.sites[0].versions[0].preview, null);
+  assert.deepEqual(fs.readdirSync(path.join(output, 'previews')), []);
 });
 test('sandbox failure is stored honestly and never retried without a sandbox', async (t) => {
   const home = temp(),

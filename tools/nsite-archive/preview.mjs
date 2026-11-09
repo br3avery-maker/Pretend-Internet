@@ -6,10 +6,26 @@ import { mime, visualHTML } from './extract.mjs';
 export const PREVIEW_CSP =
   "default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox";
 export const PREVIEW_PROFILE = 'visual-v2';
+export function previewPath(archive, hash) {
+  if (!/^[a-f0-9]{64}$/.test(hash ?? '')) return null;
+  try {
+    const file = path.join(archive.home, 'previews', hash + '.png');
+    return sha(fs.readFileSync(file)) === hash ? file : null;
+  } catch {
+    return null;
+  }
+}
 export async function screenshot(archive, snapshot, { chromium, timeout = 15000 } = {}) {
   const key = sha(JSON.stringify([snapshot.aggregate, PREVIEW_PROFILE, 390, 844]));
   const cached = archive.one('SELECT * FROM previews WHERE key=?', key);
-  if (cached?.status === 'complete') return { key, status: 'cached', hash: cached.hash };
+  if (cached?.status === 'complete') {
+    if (previewPath(archive, cached.hash))
+      return { key, status: 'cached', hash: cached.hash };
+    archive.run(
+      "UPDATE previews SET hash=NULL,size=0,status='failed',error='preview-invalid' WHERE key=?",
+      key,
+    );
+  }
   const main =
     snapshot.files.find((f) => f.path === '/index.html') ??
     snapshot.files.find((f) => mime(f.path) === 'text/html');
@@ -107,7 +123,10 @@ export async function screenshot(archive, snapshot, { chromium, timeout = 15000 
     if (archive.diskBytes() + image.length > archive.maxStorageBytes) throw Error('storage-budget');
     const hash = sha(image),
       file = path.join(archive.home, 'previews', hash + '.png');
-    if (!fs.existsSync(file)) fs.writeFileSync(file, image, { flag: 'wx', mode: 0o600 });
+    if (previewPath(archive, hash) === null) {
+      fs.rmSync(file, { force: true });
+      fs.writeFileSync(file, image, { flag: 'wx', mode: 0o600 });
+    }
     archive.run(
       'INSERT OR REPLACE INTO previews VALUES (?,?,?,?,?)',
       key,
