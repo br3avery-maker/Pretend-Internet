@@ -7,7 +7,7 @@ import { once } from 'node:events';
 import { Archive } from '../archive.mjs';
 import { Collector } from '../collect.mjs';
 import { Network, publicIP } from '../network.mjs';
-import { serve } from '../../relay-router/test/relay-server.mjs';
+import { serve } from '@pretend-internet/test-support/relay-server.mjs';
 import { event, signed, author, temp } from './fixtures.mjs';
 import { sha } from '../manifest.mjs';
 async function blobServer(t, handler) {

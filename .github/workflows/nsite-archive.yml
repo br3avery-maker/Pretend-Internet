@@ -3,10 +3,10 @@ on:
   push:
     branches: [main]
     paths:
-      ['tools/nsite-archive/**', 'tools/relay-router/**', '.github/workflows/nsite-archive.yml']
+      ['tools/nsite-archive/**', 'tools/relay-router/**', 'tools/test-support/**', '.github/workflows/nsite-archive.yml']
   pull_request:
     paths:
-      ['tools/nsite-archive/**', 'tools/relay-router/**', '.github/workflows/nsite-archive.yml']
+      ['tools/nsite-archive/**', 'tools/relay-router/**', 'tools/test-support/**', '.github/workflows/nsite-archive.yml']
 jobs:
   archive:
     runs-on: ubuntu-22.04
@@ -18,10 +18,12 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: |
-            tools/nsite-archive/package-lock.json
+            tools/test-support/package-lock.json
             tools/relay-router/package-lock.json
-      - name: Install pinned read-side router and archive dependencies
+            tools/nsite-archive/package-lock.json
+      - name: Install pinned shared relay fixture, read-side router and archive dependencies
         run: |
+          npm ci --prefix tools/test-support --ignore-scripts --no-audit --no-fund
           npm ci --prefix tools/relay-router --ignore-scripts --no-audit --no-fund
           npm ci --prefix tools/nsite-archive --ignore-scripts --no-audit --no-fund
       - name: Verify archive, resumption, provenance, hashes and network boundaries

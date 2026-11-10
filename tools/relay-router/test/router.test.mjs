@@ -4,7 +4,7 @@ import { finalizeEvent, getPublicKey } from 'nostr-tools/pure';
 import { RelayRouter,Registry,classifyKind,normalizeURL } from '../router.mjs';
 import { signedEvent } from '../validation.mjs';
 import { RelayTransport } from '../transport.mjs';
-import { serve } from './relay-server.mjs';
+import { serve } from '@pretend-internet/test-support/relay-server.mjs';
 const clock=()=>1800000000;
 const key=new Uint8Array(32).fill(1),other=new Uint8Array(32).fill(2);
 const pubkey=getPublicKey(key),otherPub=getPublicKey(other);

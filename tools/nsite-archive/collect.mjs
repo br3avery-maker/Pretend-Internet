@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { KINDS, first, tags, sha, resolveURL } from './manifest.mjs';
-import { signedEvent } from '../relay-router/validation.mjs';
+import { signedEvent } from '@pretend-internet/relay-router/validation.mjs';
 
 export const DEFAULTS = {
   maxBytes: 64 * 1024 ** 2,

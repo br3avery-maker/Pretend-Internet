@@ -1,7 +1,7 @@
 // Loopback-only end-to-end demonstration. No external relay writes.
 import { finalizeEvent } from 'nostr-tools/pure';
 import { RelayRouter,Registry } from './router.mjs';
-import { serve } from './test/relay-server.mjs';
+import { serve } from '@pretend-internet/test-support/relay-server.mjs';
 const key=new Uint8Array(32).fill(42);const at=Math.floor(Date.now()/1000);
 const sign=(kind,tags=[],content='')=>finalizeEvent({kind,tags,content,created_at:at},key);
 const destination=await serve();
