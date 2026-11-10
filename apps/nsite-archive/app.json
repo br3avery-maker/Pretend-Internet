@@ -2,7 +2,7 @@
   "schemaVersion": "0.1",
   "id": "nsite-archive",
   "name": "Nsite Archive",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "status": "testing",
   "summary": "Local nsite discovery, verified archive, full-text search, history comparison and restoration with confirmed campaign exclusion.",
   "entry": "index.html",
@@ -12,7 +12,8 @@
   "help": {
     "purpose": "Find, preserve, search and restore signed nsite publications.",
     "start": "Open Collect to discover sites or import signed events; open Backup to restore an existing full archive.",
-    "limitations": "Browser repair verified on local fixtures; installed Android APK and live relay/CORS collection remain unverified. HTTPS or supported WebView origin is needed for service-worker offline startup.",
+    "limitations": "Static archived previews disable scripts and external requests. Mobile OS suspension is not continuous background execution. Installed APK verification remains separate.",
     "data": "Archive bytes and provenance stay on this browser origin. Configured relays, servers and an explicitly selected proxy see retrieval requests. Nothing is published."
-  }
+  },
+  "icon": "assets/app-icon.png"
 }

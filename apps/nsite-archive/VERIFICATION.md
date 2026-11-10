@@ -1,4 +1,27 @@
-# Verification — multi-page repair 0.2.2
+# Verification — archive workflow repair 0.3.0
+
+## Current executed evidence — port onto current `main` (2026-11-10)
+
+This 0.3.0 workflow was originally opened as PR #20 against `c7e787a` and was unmergeable for weeks. It is now re-derived on current `main` (keeping main's clean-`dist` build and its build regression). Evidence below is from re-running the ported code on that base, not carried over from the stale branch.
+
+- Node 26.13.0: **14/14 regressions pass** (`npm test`): model/crypto/ZIP, ten-document/build membership, content-derived indexing, directory readiness gating and exact-content stacking, and static-render sanitization. All runtime JS passes `node --check`; the POSIX build produces exactly the declared runtime asset set.
+- Actual cloud Chrome against this app's HTTPS preview origin, `test/pipeline.html` "Run archive pipeline checks": **13 PASS and `ALL PIPELINE CHECKS PASSED`** — atomic progress counters, untitled-publication text search, confirmed-campaign exclusion, verification progress, interrupted-stream staging, Range resume with native-hash parity, real PNG capture, full-backup restore into a new database, directory previews with recovered names, the separate Downloads queue with current-file progress, per-site download/index controls, and `view.html` opening archived HTML in an opaque, script-free sandbox.
+- `view.html` initially failed with `Cannot read properties of null (reading 'sites')`. Cause: read handlers used the worker's shared, write-invalidated catalog after `await`. Fixed by taking one catalog snapshot per handler and never touching the shared value after an await (`archive-worker.js`). The pipeline check above is the regression evidence; it now passes from a clean database.
+- Automatic cross-document resume, measured directly: with a durable collection intent armed and the harness page untouched, opening `collect.html` raised the pending fixture jobs' attempts from 0 to 1, and opening `publishers.html` (a different document) raised them again from 1 to 2 with no Start press; the UI reported automatic retry. The transfer itself returned `http-403` **because this preview origin requires the owner's sign-in cookie and the collector deliberately fetches with `credentials:'omit'`**; the byte-level HTTP resume leg is therefore unverified on this origin and is not claimed as passing here.
+- Reflow inspected in-page at 320/390/844 CSS px with 16px and 32px root text: no horizontal overflow in any of the six combinations.
+- Bounded live read-side verification from this build: `wss://relay.nsite.lol` returned 32 signed events; publication `15128:aadb2623419a00d50b1b6ce3bf5e944fa6616591463bdc785bf332668959207c:` (30 declared files) was downloaded from `https://blossom.ditto.pub`, every file verified against its native hash, indexed, captured as a PNG, and restored byte-identically after a full backup import (`ALL LIVE END-TO-END CHECKS PASSED`). No proxy, account, signer or publication was used.
+
+The app icon shipped with this change is the previously generated artwork, downscaled to 512x512 (163 KB) with the same proportions and palette to avoid committing an 873 KB binary; `manifest.webmanifest` and the document test read the real PNG dimensions.
+
+## Remaining target boundaries
+
+No installed Android APK, secure-origin service-worker offline startup, Android picker/download bridge, OS suspension, real quota exhaustion or multi-tab fault injection was exercised here. The HTTP-fixture collection leg is blocked by the authenticated preview origin described above, not by an app failure. Static previews disable source scripts and external dependencies; they do not promise arbitrary JavaScript applications run offline.
+
+---
+
+## Historical 0.2.2 evidence — does not establish product acceptance
+
+
 
 ## Executed
 
