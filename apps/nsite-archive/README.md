@@ -35,12 +35,12 @@ The lightweight directory export uses `nsite-archive.browser-directory.v2`: filt
 - `model.js`: indexed, bounded catalog and selected-site legacy reconstruction.
 - `archive-worker.js`: storage, verification, imports, exports, search and restoration.
 - `collector.js`, `collect-worker.js`, `sw.js`: durable download scheduler, checkpointed transfer and worker transports.
-- `indexer.js`: content-derived metadata and campaign evidence.
+- `indexer.js`, `campaign.js`: content-derived metadata and the confirmed campaign signature (role opener + resource promise + unrelated link, so near misses stay visible).
 - `safe-page.js`, `screenshot.js`, `previews.js`: sandboxed static rendering and cached PNG captures.
 - `vendor/`: recovered engines with readable exported API names; see [RECOVERY.md](RECOVERY.md).
 - `test/`: deterministic fixtures, model regressions and executable browser integrity tests.
 
-Run `npm test` (14 regressions: model/crypto/ZIP, documents and clean build, content indexing, directory readiness/stacking and static-render sanitization). For browser checks, run `node test/prepare-browser.mjs`, serve the directory and open `test/browser.html` and `test/pipeline.html` **on a disposable test origin**. It deliberately seeds that origin's archive and checks real IndexedDB, signature/hash rejection, version comparison, ZIP generation, full-backup restoration into a fresh database and local pending-job collection. Test fixtures are excluded from runtime packaging.
+Run `npm test` (16 regressions: model/crypto/ZIP, documents and clean build, content indexing, directory readiness/stacking, static-render sanitization, and campaign-signature precision). For browser checks, run `node test/prepare-browser.mjs`, serve the directory and open `test/browser.html` and `test/pipeline.html` **on a disposable test origin**. It deliberately seeds that origin's archive and checks real IndexedDB, signature/hash rejection, version comparison, ZIP generation, full-backup restoration into a fresh database and local pending-job collection. Test fixtures are excluded from runtime packaging.
 
 See [VERIFICATION.md](VERIFICATION.md) for tested boundaries. No public crawl, deployment, publication, recurring job or new hosted dependency was introduced.
 

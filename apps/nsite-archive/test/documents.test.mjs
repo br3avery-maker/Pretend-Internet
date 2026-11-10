@@ -26,7 +26,7 @@ test('build cleanly replaces dist and contains exactly the current runtime asset
  const expected=new Set([
   ...Object.keys(documents).map(name=>`${name}.html`),
   'ui.js','archive-client.js','collection.js','storage.js','style.css','model.js','archive-worker.js','collect-worker.js','sw.js',
-  ...['collector.js','icons.js','indexer.js','previews.js','safe-page.js','screenshot.js'],
+  ...['campaign.js','collector.js','icons.js','indexer.js','previews.js','safe-page.js','screenshot.js'],
   'manifest.webmanifest','assets/app-icon.png',
   ...fs.readdirSync(path.join(root,'pages')).filter(name=>name.endsWith('.js')).map(name=>`pages/${name}`),
   'vendor/archive-engine.js','vendor/collector-engine.js'

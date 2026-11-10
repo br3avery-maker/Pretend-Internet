@@ -13,6 +13,14 @@ This 0.3.0 workflow was originally opened as PR #20 against `c7e787a` and was un
 
 The app icon shipped with this change is the previously generated artwork, downscaled to 512x512 (163 KB) with the same proportions and palette to avoid committing an 873 KB binary; `manifest.webmanifest` and the document test read the real PNG dimensions.
 
+## Campaign-signature precision (2026-11-10)
+
+The merged port excluded any description that merely opened with one of the five confirmed role phrases — the same false-positive behaviour the APK inspection recorded (2,008 prefix matches vs 2,004 template matches on the supplied corpus, with four `prefix_only` entries deliberately retained). The issue's blocking correction requires the confirmed promotional fingerprint to be the exclusion condition and undecided near misses to stay visible.
+
+`campaign.js` now requires all three documented signals before a site is excluded: the role-phrase opener, a generic resource promise, and an unrelated external link. The catalog keeps the matched signature (prefix plus match reasons) so a filtering decision stays explainable; the indexer records only full-signature evidence, and `model.test.mjs`, `test/campaign.test.mjs` and the browser fixtures all model the complete pattern. `npm test` covers opener-only, opener-plus-domain and opener-plus-promise descriptions staying visible in lists, text search and publisher counts, while `|` titles, one-page sites, prolific publishers and version-like strings are never classifiers.
+
+Evidence: 16/16 Node regressions (`npm test`), clean build membership including `campaign.js`, and the browser pipeline's campaign assertions after the fixture change. The supplied `all-sites.csv`, `curated-seed.csv` and `nsite-index-preview-v0.1.html` are not in this repository, so the 2,004/2,895 corpus figures were **not** re-derived here and are not claimed as reproduced.
+
 ## Remaining target boundaries
 
 No installed Android APK, secure-origin service-worker offline startup, Android picker/download bridge, OS suspension, real quota exhaustion or multi-tab fault injection was exercised here. The HTTP-fixture collection leg is blocked by the authenticated preview origin described above, not by an app failure. Static previews disable source scripts and external dependencies; they do not promise arbitrary JavaScript applications run offline.

@@ -1,4 +1,5 @@
-import {extractPage,readBlob,extractor,campaignPrefix} from './vendor/archive-engine.js';
+import {extractPage,readBlob,extractor} from './vendor/archive-engine.js';
+import {campaignMatch} from './campaign.js';
 export function describe(bytes,path){
  if(bytes.length>4194304)throw Error('Page exceeds the 4 MiB phone indexing limit; original bytes are saved.');
  const data=/\.txt$/i.test(path)?{title:'',description:'',text:new TextDecoder().decode(bytes).slice(0,1048576),headings:[],links:[],subjects:[]}:extractPage(bytes,path);
@@ -19,7 +20,7 @@ export async function indexArchive(db,{site,hash,retry=false,signal,onProgress=(
    if(!complete.has(f.hash)||hash&&f.hash!==hash||! /\.(html?|txt)$/i.test(f.path))continue;
    const id=`${f.hash}\n${f.path}\n${extractor}`;if(seen.has(id))continue;seen.add(id);
    if(!retry&&((await db.get('pages',id))?.data?.titleBasis||await db.get('index-failures',id)))continue;
-   try{const data=describe(await readBlob(db,f.hash),f.path);const prefix=campaignPrefix(data.publishedDescription||data.description)||campaignPrefix(v.published?.description);if(prefix)await db.put('settings',{id:'spam-observed:'+v.site,prefix,path:f.path,hash:f.hash});await db.put('pages',{id,hash:f.hash,path:f.path,data,extractor});await db.delete('index-failures',id);indexed++;onProgress({phase:'index',site:v.site,path:f.path,indexed});}
+   try{const data=describe(await readBlob(db,f.hash),f.path);const match=campaignMatch(data.publishedDescription||data.description)||campaignMatch(v.published?.description);if(match)await db.put('settings',{id:'spam-observed:'+v.site,prefix:match.prefix,reasons:match.reasons,path:f.path,hash:f.hash});await db.put('pages',{id,hash:f.hash,path:f.path,data,extractor});await db.delete('index-failures',id);indexed++;onProgress({phase:'index',site:v.site,path:f.path,indexed});}
    catch(e){if(e.message==='missing-blob')continue;if(e.name==='QuotaExceededError')throw e;const failure={id,hash:f.hash,path:f.path,error:e.message};failures.push(failure);await db.put('index-failures',failure);}
    await new Promise(r=>setTimeout(r,0));
   }
