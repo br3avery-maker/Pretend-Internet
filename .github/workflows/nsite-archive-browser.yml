@@ -1,4 +1,4 @@
-name: Nsite archive browser checks
+name: Nsite archive unit, build and browser pipeline checks
 on:
   push:
     paths: ['apps/nsite-archive/**', '.github/workflows/nsite-archive-browser.yml']
@@ -8,15 +8,29 @@ permissions:
   contents: read
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 refuses to install on ubuntu-latest (26.04); the sibling
+    # tools/nsite-archive job pins its image for the same reason.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm test
+          cache: npm
+          cache-dependency-path: apps/nsite-archive/package-lock.json
+      - name: Install pinned browser-test dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: apps/nsite-archive
-      - run: sh build.sh
+      - name: Unit tests, build output and script syntax
+        run: |
+          npm test
+          sh build.sh
+          for f in *.js pages/*.js; do node --check "$f"; done
         working-directory: apps/nsite-archive
-      - run: for f in *.js pages/*.js; do node --check "$f"; done
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/nsite-archive
+      - name: Run test/pipeline.html in Chromium (fixture phases only)
+        run: npm run test:pipeline
         working-directory: apps/nsite-archive
