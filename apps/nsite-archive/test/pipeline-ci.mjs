@@ -2,6 +2,7 @@
 // Only the two fixture-driven phases are exercised: the live-publication phase
 // reaches public relays on purpose and stays a manual, separately recorded
 // check. Deterministic or nothing: no retries, and any page error fails.
+import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {chromium} from '@playwright/test';
 import {startServer} from './serve.mjs';
@@ -46,10 +47,15 @@ try{
   const pipeline = await phase(page, 'run', 'ALL PIPELINE CHECKS PASSED');
   const continuity = await phase(page, 'continuity', 'ALL CONTINUITY CHECKS PASSED');
   if(errors.length) fail('page errors during the pipeline', errors);
-  const checks = `${pipeline}\n${continuity}`.split('\n').filter(line => line.startsWith('PASS ')).length;
-  console.log(`Context: ${await page.evaluate(() => (isSecureContext ? 'secure context' : 'non-secure context'))}`);
-  console.log(`PASS lines: ${checks}`);
-  for(const line of `${pipeline}\n${continuity}`.split('\n').filter(line => line.startsWith('PASS ') || line.startsWith('ALL '))) console.log('  ' + line);
+  const lines = `${pipeline}\n${continuity}`.split('\n').filter(line => line.startsWith('PASS ') || line.startsWith('ALL '));
+  const checks = lines.filter(line => line.startsWith('PASS ')).length;
+  const contextLabel = await page.evaluate(() => (isSecureContext ? 'secure context' : 'non-secure context'));
+  const report = [`Context: ${contextLabel}`, `PASS lines: ${checks}`, ...lines.map(line => '  ' + line)].join('\n');
+  console.log(report);
+  if(process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Browser pipeline\n\n\`\`\`\n${report}\n\`\`\`\n`);
+  // 13 checks in the pipeline phase and 3 in the continuity phase today; the
+  // floor fails a phase that returns early without listing its checks.
+  if(checks < 15) fail(`only ${checks} PASS lines; the phases did not run as expected`, [report]);
   console.log('ALL BROWSER PIPELINE CHECKS PASSED');
 } finally {
   await browser.close();
