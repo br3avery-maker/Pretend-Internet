@@ -21,6 +21,8 @@ The merged port excluded any description that merely opened with one of the five
 
 Evidence: 16/16 Node regressions (`npm test`), clean build membership including `campaign.js`, and the browser pipeline's campaign assertions after the fixture change. The supplied `all-sites.csv`, `curated-seed.csv` and `nsite-index-preview-v0.1.html` are not in this repository, so the 2,004/2,895 corpus figures were **not** re-derived here and are not claimed as reproduced.
 
+Two guards followed in the same review, because without them the three-signal rule degenerated to "opener plus anything": two of the five openers already contain a promise word (`Community writer sharing`, `Digital resources editor`), and a bare file name such as `index.html`, `Node.js` or `data.json` satisfied the link. The promise is now looked for **after** the opener, and a bare candidate whose last label is a file or asset extension is a file reference rather than an external link — a full URL or `www.` form still counts, and a file reference followed later by a real domain still matches. `test/campaign.test.mjs` asserts both guards; the five campaign fixtures keep the full signature and are still excluded by the catalog test.
+
 ## Remaining target boundaries
 
 No installed Android APK, secure-origin service-worker offline startup, Android picker/download bridge, OS suspension, real quota exhaustion or multi-tab fault injection was exercised here. The HTTP-fixture collection leg is blocked by the authenticated preview origin described above, not by an app failure. Static previews disable source scripts and external dependencies; they do not promise arbitrary JavaScript applications run offline.

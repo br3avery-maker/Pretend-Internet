@@ -35,7 +35,7 @@ The lightweight directory export uses `nsite-archive.browser-directory.v2`: filt
 - `model.js`: indexed, bounded catalog and selected-site legacy reconstruction.
 - `archive-worker.js`: storage, verification, imports, exports, search and restoration.
 - `collector.js`, `collect-worker.js`, `sw.js`: durable download scheduler, checkpointed transfer and worker transports.
-- `indexer.js`, `campaign.js`: content-derived metadata and the confirmed campaign signature (role opener + resource promise + unrelated link, so near misses stay visible).
+- `indexer.js`, `campaign.js`: content-derived metadata and the confirmed campaign signature (role opener + resource promise + unrelated link, so near misses stay visible; the promise must appear after the opener, and file names such as `index.html` are not links).
 - `safe-page.js`, `screenshot.js`, `previews.js`: sandboxed static rendering and cached PNG captures.
 - `vendor/`: recovered engines with readable exported API names; see [RECOVERY.md](RECOVERY.md).
 - `test/`: deterministic fixtures, model regressions and executable browser integrity tests.
