@@ -1,4 +1,5 @@
-import { campaignPrefix, aggregate } from './vendor/archive-engine.js';
+import { aggregate } from './vendor/archive-engine.js';
+import { campaignMatch } from './campaign.js';
 
 export const newest = (a,b) => b.event.created_at-a.event.created_at || a.id.localeCompare(b.id);
 const key = f => `${f.hash}\n${f.path}`;
@@ -19,11 +20,14 @@ export function buildCatalog(records, pages, jobs, settings) {
     const latest = materialize(versions,versions[0].id);
     latestBySite.set(id,latest);
     const derived=latest.files.map(f=>pageMap.get(key(f))).filter(Boolean).sort((a,b)=>{const rank=p=>/^\/(index|home)\.html?$/i.test(p)?0:/\.html?$/i.test(p)?1:2;return rank(a.path)-rank(b.path)||a.path.length-b.path.length;});
-    let excluded=Boolean(settingMap.get('spam-observed:'+id)?.prefix);
+    // One confirmed signature per site, recorded so a filtering decision stays explainable.
+    const recorded=settingMap.get('spam-observed:'+id);
+    let campaign=recorded?.prefix?{prefix:recorded.prefix,reasons:recorded.reasons||['recorded-signature']}:null;
     for (const v of versions) {
-      if(campaignPrefix(v.published?.description)) { excluded=true; break; }
-      if(v.files.some(f=>campaignPrefix(pageMap.get(key(f))?.data?.description))) { excluded=true; break; }
+      if(campaign) break;
+      campaign=campaignMatch(v.published?.description)||v.files.map(f=>campaignMatch(pageMap.get(key(f))?.data?.description)).find(Boolean)||null;
     }
+    const excluded=Boolean(campaign);
     const title=latest.published?.title || derived.find(p=>p.data?.title)?.data.title || 'Untitled site';
     const description=latest.published?.description || derived.find(p=>p.data?.description)?.data.description || '';
     const verified=latest.files.filter(f=>jobMap.get(f.hash)?.state==='complete').length;
@@ -33,7 +37,7 @@ export function buildCatalog(records, pages, jobs, settings) {
     sites.push({ id,publisher:latest.event.pubkey,title,description,
       complete,indexed,preview,subjects:[...new Set(derived.flatMap(p=>p.data?.subjects?.map(x=>x.value)||[]))].slice(0,8),created:latest.event.created_at,versions:versions.length,files:latest.files.length,nativeHash:latest.nativeHash,
       verified,
-      hidden:Boolean(settingMap.get('hidden:'+id)?.hidden),excluded,
+      hidden:Boolean(settingMap.get('hidden:'+id)?.hidden),excluded,campaign,
       search:[id,latest.event.pubkey,...versions.flatMap(v=>[v.published?.title,v.published?.description]),
         ...derived.flatMap(p=>[p.data?.title,p.data?.description,p.data?.text])].filter(Boolean).join(' ').toLowerCase(),
     });

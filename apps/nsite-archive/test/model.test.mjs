@@ -6,7 +6,7 @@ test('signed publications reject altered signatures',()=>{const {event}=signed()
 test('confirmed signatures exclude all ordinary lists, searches and publisher counts',()=>{
  const b=fixtureBundle(),records=b.stores.versions;
  const body=records.find(r=>r.site.endsWith(':body-campaign'));
- const pages=[{hash:body.files[0].hash,path:'/index.html',data:{description:'Independent web researcher promoting the confirmed campaign.'}}];
+ const pages=[{hash:body.files[0].hash,path:'/index.html',data:{description:'Independent web researcher sharing curated resources at promo-body.example.com'}}];
  const c=buildCatalog(records,pages,b.stores.jobs,[]),list=listCatalog(c);
  assert.equal(list.excluded,6);assert.equal(list.total,2);assert.equal(list.publishers.length,2);
  assert.equal(listCatalog(c,{query:'Excluded campaign'}).total,0);assert.equal(listCatalog(c,{hidden:true}).total,2);
