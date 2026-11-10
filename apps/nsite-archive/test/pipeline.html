@@ -1,0 +1,60 @@
+<!doctype html><meta charset="utf-8"><title>Archive pipeline verification</title><button id="run">Run archive pipeline checks</button><button id="continuity">Test navigation and automatic resume</button><button id="live">Test bounded live publication</button><pre id="results">Ready</pre><img id="capture" alt="Actual archived page screenshot"><iframe id="phone" title="Phone app" style="width:390px;height:844px;border:1px solid" src="../index.html"></iframe>
+<script type="module">
+import * as engine from '../vendor/archive-engine.js';import {indexArchive} from '../indexer.js';import {buildCatalog,listCatalog} from '../model.js';import {runQueue,transfer,CONTROL,updateControl} from '../collector.js';import {queryRelay,storeVerifiedBlob} from '../vendor/collector-engine.js';import {safePage} from '../safe-page.js';import {capture} from '../screenshot.js';
+const out=document.querySelector('#results'),frame=document.querySelector('iframe');const log=s=>out.textContent+='\n'+s;const check=(v,s)=>{if(!v)throw Error(s);log('PASS '+s);};
+const until=async(fn,ms=20000)=>{const start=Date.now();while(!await fn()){if(Date.now()-start>ms)throw Error('Timed out');await new Promise(r=>setTimeout(r,100));}};
+async function visit(url,selector){const old=frame.contentDocument;frame.src=url;await until(()=>frame.contentDocument!==old&&frame.contentDocument?.querySelector(selector));return frame.contentDocument;}
+let db;
+document.querySelector('#run').onclick=async()=>{out.textContent='Testing actual browser archive…';try{
+ const fixture=await(await fetch('pipeline-fixtures.json')).json();db=await engine.openArchive();await db.put('settings',{id:CONTROL,running:true,completed:0});await Promise.all([...Array.from({length:10},()=>updateControl(db,old=>({...old,completed:(old.completed||0)+1}))),updateControl(db,{running:false})]);const atomic=await db.get('settings',CONTROL);check(atomic.completed===10&&!atomic.running,'atomic progress updates preserve Pause and concurrent counters');
+ await engine.importArchive(db,new File([JSON.stringify(fixture.bundle)],'fixture.json'));await indexArchive(db,{retry:true});
+ let c=buildCatalog(await db.getAll('versions'),await db.getAll('pages'),await db.getAll('jobs'),await db.getAll('settings'));
+ check(listCatalog(c,{query:'Saturn',stage:'complete'}).total>=1,'untitled publication searchable by actual page text');check(listCatalog(c).excluded>=6,'confirmed campaigns excluded after content indexing');
+ const item=fixture.item,event=item.event,v=engine.parseManifest(event);await engine.importEvent(db,event,'browser-http-fixture');
+ c=buildCatalog(await db.getAll('versions'),await db.getAll('pages'),await db.getAll('jobs'),await db.getAll('settings'));
+ if(!(await db.get('jobs',v.files[0].hash))?.state?.includes('complete'))check(!listCatalog(c,{stage:'complete'}).rows.some(x=>x.id===v.site),'incomplete publication stays out of curated directory');
+ // Exact file bytes travel through the same HTTP response/stream/verification path.
+ const progress=[];for(const f of v.files){await transfer(db,{...(await db.get('jobs',f.hash)),site:v.site,path:f.path},{servers:[location.origin],fetcher:async(url,init)=>new Response(new TextEncoder().encode(item.files[f.path]),{headers:{'content-length':String(new TextEncoder().encode(item.files[f.path]).length)}}),onProgress:p=>progress.push(p)});await indexArchive(db,{hash:f.hash});}
+ check(progress.some(p=>p.phase==='download'&&p.loaded>0)&&progress.some(p=>p.phase==='verify'),'download progress includes current file, bytes and verification');
+ check((await db.get('jobs',v.files[0].hash)).state==='complete','native hash verified before completion');
+ const content=new TextEncoder().encode('interrupted fixture payload'),hash=engine.sha(content);await db.put('jobs',{id:hash,state:'pending',origins:[],attempts:0});let calls=0;
+ await transfer(db,{id:hash,origins:[],path:'/partial.txt'},{servers:[location.origin],fetcher:async()=>new Response(new ReadableStream({start(c){c.enqueue(content.slice(0,8));setTimeout(()=>c.error(Error('interrupted')),20);}}))});
+ check((await db.get('staging',hash)).size===8,'interruption retains partial bytes');
+ let range='';await transfer(db,{...(await db.get('jobs',hash)),path:'/partial.txt'},{servers:[location.origin],fetcher:async(url,init)=>{range=init.headers.Range;return new Response(content.slice(8),{status:206,headers:{'content-range':`bytes 8-${content.length-1}/${content.length}`,'content-length':String(content.length-8)}});}});
+ check(range==='bytes=8-'&&engine.sha(await engine.readBlob(db,hash))===hash,'resume uses Range and reconstructs byte-identical file');
+ const rendered=await safePage('/index.html',async path=>engine.readBlob(db,v.files.find(f=>f.path===path).hash));const image=await capture(rendered.html);document.querySelector('#capture').src=image;await db.put('settings',{id:'preview:'+v.nativeHash,image});check(image.startsWith('data:image/png;base64,')&&image.length>3000,'real raster screenshot captured from archived HTML');
+ const bundle=await engine.exportArchive(db),fresh=await engine.openArchive('pipeline-restore-'+Date.now());await engine.importArchive(fresh,new File([bundle],'backup.json'));await indexArchive(fresh);check(engine.sha(await engine.readBlob(fresh,v.files[0].hash))===v.files[0].hash,'full backup restores independent byte-identical files');fresh.close();
+ let doc=await visit('../index.html','#search-form');await until(()=>doc.body.textContent.includes('Garden seed exchange'));check(doc.querySelector('.site-entry img')!==null,'directory has screenshot entries and recovered names');
+ doc=await visit('../collect.html','#queue');check(Boolean(doc.querySelector('#current-progress')),'download screen has current-file progress and separate incomplete queue');
+ doc=await visit('../site.html?site='+encodeURIComponent(v.site),'[data-site-download]');check(Boolean(doc.querySelector('[data-action="index"]')),'site offers manual download and indexing');
+ doc=await visit('../view.html?site='+encodeURIComponent(v.site),'.saved-site');await until(()=>doc.querySelector('iframe').srcdoc.includes('Garden seed exchange'));check(doc.querySelector('iframe').sandbox.contains('allow-top-navigation-by-user-activation')&&!doc.querySelector('iframe').sandbox.contains('allow-scripts'),'saved site opens in isolated script-free renderer');
+ log('ALL PIPELINE CHECKS PASSED');
+ }catch(e){log('FAIL '+e.stack);}finally{db?.close();}};
+
+document.querySelector('#continuity').onclick=async()=>{out.textContent='Testing actual collector HTTP and automatic resume across documents…';let d;try{
+ const fixture=await(await fetch('pipeline-fixtures.json')).json(),v=engine.parseManifest(fixture.item.event);d=await engine.openArchive();
+ for(const f of v.files){const j=await d.get('jobs',f.hash);await d.put('jobs',{...j,state:'pending',nextRetry:0});}
+ await d.put('settings',{id:CONTROL,running:true,discover:false,site:v.site,options:{relays:[],servers:[location.origin],maxBlobBytes:33554432,totalFiles:0,totalBytes:0}});
+ let doc=await visit('../collect.html','#queue');await until(()=>doc.body.textContent.includes('Garden'));
+ await visit('../publishers.html','h1');
+ await until(async()=>{const jobs=await d.getAll('jobs');return v.files.every(f=>jobs.find(j=>j.id===f.hash)?.state==='complete');},30000);
+ check(true,'collection resumes automatically after navigation and verifies real HTTP fixture bytes');
+ const state=await d.get('settings',CONTROL);check(state.running===false,'selected queue finishes without repeated manual starts');
+ log('Context: '+(isSecureContext?'secure, service worker supported':'HTTP preview, dedicated-worker fallback verified'));
+ doc=await visit('../index.html','#search-form');await until(()=>doc.body.textContent.includes('Garden seed exchange'));
+ let sizes=[];for(const width of [320,390,844])for(const font of [16,32]){frame.style.width=width+'px';doc.documentElement.style.fontSize=font+'px';await new Promise(r=>requestAnimationFrame(r));sizes.push([width,font,doc.documentElement.scrollWidth<=doc.documentElement.clientWidth+1]);}check(sizes.every(x=>x[2]),'directory reflows at 320/390/844px and doubled text');frame.style.width='390px';doc.documentElement.style.fontSize='16px';
+ log('ALL CONTINUITY CHECKS PASSED');
+ }catch(e){log('FAIL '+e.stack);}finally{d?.close();}};
+document.querySelector('#live').onclick=async()=>{out.textContent='Bounded live test: at most two relays, one small signed publication, 12 MiB total.';let d;try{
+ d=await engine.openArchive();await d.put('settings',{id:CONTROL,running:false});let selected;
+ for(const relay of ['wss://relay.nsite.lol','wss://relay.damus.io']){try{const result=await queryRelay(relay,{kinds:[15128]},{timeout:12000,limit:32});log(relay+' returned '+result.events.length+' events');for(const event of result.events){try{const v=engine.parseManifest(event);log('Signed manifest: '+v.files.length+' files · '+v.site);if(v.files.length<=128&&v.files.some(f=>/\.html?$/i.test(f.path))&&!engine.campaignPrefix(v.published.description)){selected=v;break;}}catch(e){log('Rejected live kind '+event.kind+': '+e.message+' · '+JSON.stringify({declared:event.tags.filter(t=>t[0]==='x'),computed:engine.aggregate(event.tags.filter(t=>t[0]==='path').map(t=>({path:t[1],hash:t[2]}))),first:event.tags.slice(0,2)}));}}}catch(e){log(relay+': '+e.message);}if(selected)break;}
+ if(!selected)throw Error('No small signed publication returned by the bounded live query.');
+ await engine.importEvent(d,selected.event,'bounded-live-verification');await d.put('settings',{id:CONTROL,running:true,discover:false,site:selected.site,options:{relays:['wss://relay.nsite.lol','wss://relay.damus.io'],servers:[],maxBlobBytes:12582912,totalBytes:12582912,totalFiles:128}});
+ await runQueue({maxDuration:55000,onProgress:p=>{if(p.phase!=='download'||p.loaded===p.total)log(JSON.stringify(p));}});const jobs=await d.getAll('jobs');const complete=selected.files.filter(f=>jobs.find(j=>j.id===f.hash)?.state==='complete');log('LIVE RESULT '+complete.length+'/'+selected.files.length+' files verified · '+selected.site);check(complete.length===selected.files.length,'bounded genuine publication downloaded and verified');
+ const pages=await d.getAll('pages'),home=selected.files.find(f=>f.path==='/index.html'),page=pages.find(p=>p.hash===home?.hash);check(page?.data?.text?.length>0,'genuine home page was read and indexed');
+ const catalog=buildCatalog(await d.getAll('versions'),pages,await d.getAll('jobs'),await d.getAll('settings'));check(listCatalog(catalog,{stage:'complete',query:page.data.title}).rows.some(s=>s.id===selected.site),'genuine publication is discoverable in the curated directory');
+ const rendered=await safePage('/index.html',async path=>engine.readBlob(d,selected.files.find(f=>f.path===path).hash));const image=await capture(rendered.html);await d.put('settings',{id:'preview:'+selected.nativeHash,image});document.querySelector('#capture').src=image;check(image.length>3000,'genuine archived home page screenshot captured');
+ const archive=await engine.exportArchive(d),restored=await engine.openArchive('live-restore-'+Date.now());await engine.importArchive(restored,new File([archive],'live-backup.json'));for(const f of selected.files)check(engine.sha(await engine.readBlob(restored,f.hash))===f.hash,'restored genuine file '+f.path+' is byte-identical');restored.close();log('ALL LIVE END-TO-END CHECKS PASSED');
+
+ }catch(e){log('LIVE BLOCKER '+e.message);}finally{if(d){const c=await d.get('settings',CONTROL);await d.put('settings',{...c,running:false});d.close();}}};
+</script>

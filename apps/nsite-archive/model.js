@@ -18,7 +18,7 @@ export function buildCatalog(records, pages, jobs, settings) {
     versions.sort(newest);
     const latest = materialize(versions,versions[0].id);
     latestBySite.set(id,latest);
-    const derived=latest.files.map(f=>pageMap.get(key(f))).filter(Boolean);
+    const derived=latest.files.map(f=>pageMap.get(key(f))).filter(Boolean).sort((a,b)=>{const rank=p=>/^\/(index|home)\.html?$/i.test(p)?0:/\.html?$/i.test(p)?1:2;return rank(a.path)-rank(b.path)||a.path.length-b.path.length;});
     let excluded=Boolean(settingMap.get('spam-observed:'+id)?.prefix);
     for (const v of versions) {
       if(campaignPrefix(v.published?.description)) { excluded=true; break; }
@@ -26,9 +26,13 @@ export function buildCatalog(records, pages, jobs, settings) {
     }
     const title=latest.published?.title || derived.find(p=>p.data?.title)?.data.title || 'Untitled site';
     const description=latest.published?.description || derived.find(p=>p.data?.description)?.data.description || '';
+    const verified=latest.files.filter(f=>jobMap.get(f.hash)?.state==='complete').length;
+    const indexed=derived.length,needsIndex=latest.files.some(f=>/\.(html?|txt)$/i.test(f.path));
+    const complete=verified===latest.files.length&&(!needsIndex||indexed>0);
+    const preview=settingMap.get('preview:'+latest.nativeHash)?.image||null;
     sites.push({ id,publisher:latest.event.pubkey,title,description,
-      created:latest.event.created_at,versions:versions.length,files:latest.files.length,nativeHash:latest.nativeHash,
-      verified:latest.files.filter(f=>jobMap.get(f.hash)?.state==='complete').length,
+      complete,indexed,preview,subjects:[...new Set(derived.flatMap(p=>p.data?.subjects?.map(x=>x.value)||[]))].slice(0,8),created:latest.event.created_at,versions:versions.length,files:latest.files.length,nativeHash:latest.nativeHash,
+      verified,
       hidden:Boolean(settingMap.get('hidden:'+id)?.hidden),excluded,
       search:[id,latest.event.pubkey,...versions.flatMap(v=>[v.published?.title,v.published?.description]),
         ...derived.flatMap(p=>[p.data?.title,p.data?.description,p.data?.text])].filter(Boolean).join(' ').toLowerCase(),
@@ -52,17 +56,19 @@ export function materialize(versions,id) {
   return {...target,files:tree,eventIds:events,nativeHash:aggregate(tree),coverage:'legacy-observed-tree'};
 }
 
-export function listCatalog(catalog,{query='',sort='recent',publisher='',hidden=false,offset=0,limit=40}={}) {
+export function listCatalog(catalog,{query='',sort='recent',publisher='',hidden=false,offset=0,limit=40,stage='all',stack=false}={}) {
   const words=query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const visible=catalog.sites.filter(s=>!s.excluded && (hidden||!s.hidden));
+  const eligible=catalog.sites.filter(s=>!s.excluded && (hidden||!s.hidden));
+  const visible=eligible.filter(s=>stage==='complete'?s.complete:stage==='incomplete'?!s.complete:true);
   const counts=new Map();
   for(const s of visible) counts.set(s.publisher,(counts.get(s.publisher)||0)+1);
-  const results=visible.filter(s=>(!publisher||s.publisher===publisher)&&words.every(w=>s.search.includes(w)));
+  let results=visible.filter(s=>(!publisher||s.publisher===publisher)&&words.every(w=>s.search.includes(w)));
   results.sort((a,b)=>sort==='title'?a.title.localeCompare(b.title):sort==='files'?b.files-a.files:
     sort==='publisher-count'?(counts.get(b.publisher)-counts.get(a.publisher)||a.publisher.localeCompare(b.publisher)||a.title.localeCompare(b.title)):
     b.created-a.created||a.id.localeCompare(b.id));
+  if(stack){const groups=new Map();for(const s of results){const key=s.nativeHash;let group=groups.get(key);if(!group){group={...s,members:[],publishers:[],versions:0};groups.set(key,group);}group.members.push({id:s.id,publisher:s.publisher,versions:s.versions,title:s.title});group.versions+=s.versions;if(!group.publishers.includes(s.publisher))group.publishers.push(s.publisher);if(s.preview)group.preview=s.preview;}results=[...groups.values()];}
   const publishers=[...counts].map(([id,count])=>({id,count})).sort((a,b)=>b.count-a.count||a.id.localeCompare(b.id));
-  return {total:results.length,excluded:catalog.sites.filter(s=>s.excluded).length,publishers,
+  return {total:results.length,pending:eligible.filter(s=>!s.complete).length,complete:eligible.filter(s=>s.complete).length,excluded:catalog.sites.filter(s=>s.excluded).length,publishers,
     rows:results.slice(offset,offset+limit).map(({search,...s})=>({...s,publisherCount:counts.get(s.publisher)}))};
 }
 
