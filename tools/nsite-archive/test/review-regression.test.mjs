@@ -8,7 +8,7 @@ import { screenshot } from '../preview.mjs';
 import { extractHTML, visualHTML } from '../extract.mjs';
 import { sha } from '../manifest.mjs';
 import { event, signed, temp, author } from './fixtures.mjs';
-import { serve } from '../../relay-router/test/relay-server.mjs';
+import { serve } from '@pretend-internet/test-support/relay-server.mjs';
 function archive(t) {
   const home = temp(),
     a = new Archive(home);

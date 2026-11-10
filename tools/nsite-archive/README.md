@@ -6,9 +6,10 @@ Complete nsite collection with content deduplication, signed publication history
 
 ## Run
 
-Node **22.13 or later** (SQLite is built in), npm, and a writable local directory. Install the existing read-side relay component and this worker from the repository root:
+Node **22.13 or later** (SQLite is built in), npm, and a writable local directory. This worker imports the existing read-side relay router, and its tests use the shared local relay fixture, so install all three from the repository root in this order:
 
 ```sh
+npm ci --prefix tools/test-support --ignore-scripts
 npm ci --prefix tools/relay-router --ignore-scripts
 npm ci --prefix tools/nsite-archive --ignore-scripts
 cd tools/nsite-archive
@@ -18,6 +19,8 @@ node cli.mjs status
 node cli.mjs export ./collection-001
 node cli.mjs serve ./collection-001
 ```
+
+Each package installs its own dependencies. The router is a declared `file:../relay-router` dependency and the shared fixture is a declared `file:../test-support` dev dependency; nothing here reaches into another package's `node_modules`. If a fixture or router entry point moves, `test/dependencies.test.mjs` fails with the install command that repairs it.
 
 Open **http://127.0.0.1:8765**. Search actual page text, expand publishers to browse their namespaces, open site details and compare versions, or browse exact-content groups, declared families and probable clones. Sort and filters are secondary controls. The default interface is black `#000000`, deep pink `#FF1493`, white and pale pink.
 
@@ -130,4 +133,4 @@ npm run test:sandbox
 
 Unit and real loopback network tests cover signature/hash failures, pre-dedup/provenance, modern/legacy/snapshot histories, same-second coverage gaps, resume, fallback, untitled indexing, CDC insertion reuse, Hashtree decoding, corruption, exact restoration, filters and screenshot isolation. Browser tests exercise the actual directory at 320/390/844px and 200% text, version comparisons, Back and file import. The strict sandbox test must run on a supported host and requires a real PNG with an untouched external-request canary.
 
-Reuse: existing `tools/relay-router` signature validation and finite relay query transport (it does not publish here); **@hashtree/core 0.3.2** (MIT), **parse5 8.0.0** (MIT), **ws 8.22.0** (MIT), and development-only **@playwright/test 1.56.1** (Apache-2.0). Router dependency **nostr-tools 2.25.2** is Unlicense. Exact dependency trees and integrity hashes are committed in the lockfiles. No donor application or private Library content is bundled. See [research and design](RESEARCH.md).
+Reuse: existing `tools/relay-router` signature validation and finite relay query transport (declared as `file:../relay-router`; it does not publish here), and the shared loopback relay fixture in `tools/test-support` for tests (declared as `file:../test-support`). Direct dependencies **@hashtree/core 0.3.2** (MIT), **parse5 8.0.0** (MIT), **ws 8.22.0** (MIT); development-only **@playwright/test 1.56.1** (Apache-2.0) and **nostr-tools 2.25.2** (Unlicense) for signed fixtures. The router's own `nostr-tools` pin is 2.25.2 as well. Exact dependency trees and integrity hashes are committed in the lockfiles of all three packages. No donor application or private Library content is bundled. See [research and design](RESEARCH.md).

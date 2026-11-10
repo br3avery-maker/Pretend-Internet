@@ -1,0 +1,14 @@
+{
+  "name": "@pretend-internet/test-support",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared local relay fixture for operator tool test suites",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "nostr-tools": "2.25.2",
+    "ws": "8.22.0"
+  }
+}

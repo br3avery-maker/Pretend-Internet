@@ -15,9 +15,12 @@
   "dependencies": {
     "@hashtree/core": "0.3.2",
     "parse5": "8.0.0",
-    "ws": "8.22.0"
+    "ws": "8.22.0",
+    "@pretend-internet/relay-router": "file:../relay-router"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1"
+    "@playwright/test": "1.56.1",
+    "nostr-tools": "2.25.2",
+    "@pretend-internet/test-support": "file:../test-support"
   }
 }

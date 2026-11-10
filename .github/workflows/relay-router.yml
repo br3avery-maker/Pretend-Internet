@@ -4,10 +4,12 @@ on:
     branches: [main]
     paths:
       - 'tools/relay-router/**'
+      - 'tools/test-support/**'
       - '.github/workflows/relay-router.yml'
   pull_request:
     paths:
       - 'tools/relay-router/**'
+      - 'tools/test-support/**'
       - '.github/workflows/relay-router.yml'
 jobs:
   relay-router:
@@ -19,10 +21,13 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: tools/relay-router/package-lock.json
-      - name: Install pinned dependencies
-        working-directory: tools/relay-router
-        run: npm ci --ignore-scripts --no-audit --no-fund
+          cache-dependency-path: |
+            tools/test-support/package-lock.json
+            tools/relay-router/package-lock.json
+      - name: Install pinned shared relay fixture and router dependencies
+        run: |
+          npm ci --prefix tools/test-support --ignore-scripts --no-audit --no-fund
+          npm ci --prefix tools/relay-router --ignore-scripts --no-audit --no-fund
       - name: Verify universal routing and protocol boundaries
         working-directory: tools/relay-router
         run: |

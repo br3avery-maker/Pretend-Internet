@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { signedEvent, hex64 } from '../relay-router/validation.mjs';
+import { signedEvent, hex64 } from '@pretend-internet/relay-router/validation.mjs';
 import { chunks, merkleFile, merkleDirectory, PROFILE } from './chunks.mjs';
 import { parseManifest, tags, first, sha, aggregate, gatewayURL, safePath } from './manifest.mjs';
 import { extractHTML, EXTRACTOR, mime } from './extract.mjs';

@@ -3,8 +3,8 @@ import https from 'node:https';
 import { lookup } from 'node:dns/promises';
 import { isIP, BlockList } from 'node:net';
 import WebSocket from 'ws';
-import { RelayTransport } from '../relay-router/transport.mjs';
-import { normalizeURL } from '../relay-router/validation.mjs';
+import { RelayTransport } from '@pretend-internet/relay-router/transport.mjs';
+import { normalizeURL } from '@pretend-internet/relay-router/validation.mjs';
 
 const blocked4 = new BlockList(),
   blocked6 = new BlockList();

@@ -17,11 +17,12 @@ This routes protocol envelopes; it does not invent or implement every applicatio
 
 ## Run
 
-Node 22+; runtime dependency `nostr-tools` 2.25.2 (Unlicense). `ws` 8.22.0 (MIT) is used only by the local test servers. Exact versions/integrities are in `package-lock.json`. Browser bundlers may import `router.mjs`; the runtime uses standard fetch, WebSocket, TextEncoder and crypto APIs.
+Node 22+; runtime dependency `nostr-tools` 2.25.2 (Unlicense). The local test relay lives in `tools/test-support` (declared here as a `file:` devDependency) and owns `ws` 8.22.0 (MIT) for both consumers. Exact versions/integrities are in `package-lock.json`. Browser bundlers may import `router.mjs`; the runtime uses standard fetch, WebSocket, TextEncoder and crypto APIs.
 
 ```sh
+npm ci --prefix tools/test-support --ignore-scripts
+npm ci --prefix tools/relay-router --ignore-scripts
 cd tools/relay-router
-npm ci --ignore-scripts
 npm test
 node demo.mjs
 node test/mutation.mjs

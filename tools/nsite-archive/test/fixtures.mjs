@@ -4,7 +4,7 @@ import path from 'node:path';
 import {
   finalizeEvent,
   getPublicKey,
-} from '../../relay-router/node_modules/nostr-tools/lib/esm/pure.js';
+} from 'nostr-tools/pure';
 import { sha, aggregate } from '../manifest.mjs';
 export const key = Uint8Array.from({ length: 32 }, (_, i) => (i === 31 ? 1 : 0));
 export const key2 = Uint8Array.from({ length: 32 }, (_, i) => (i === 31 ? 2 : 0));

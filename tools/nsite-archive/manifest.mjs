@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { nip19 } from '../relay-router/node_modules/nostr-tools/lib/esm/index.js';
-import { signedEvent, hex64 } from '../relay-router/validation.mjs';
+import { nip19 } from '@pretend-internet/relay-router/node_modules/nostr-tools/lib/esm/index.js';
+import { signedEvent, hex64 } from '@pretend-internet/relay-router/validation.mjs';
 
 export const sha = (value) => createHash('sha256').update(value).digest('hex');
 export const KINDS = [15128, 35128, 5128, 34128];
