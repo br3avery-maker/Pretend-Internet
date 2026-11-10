@@ -1,4 +1,4 @@
-name: Mini-app metadata and frontend build
+name: Mini-app metadata, frontend build and Folder Launcher regressions
 on:
   push:
     branches: [main]

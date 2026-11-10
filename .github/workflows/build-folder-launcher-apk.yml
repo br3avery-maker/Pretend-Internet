@@ -1,4 +1,4 @@
-name: Build Folder Launcher APK
+name: Build, verify and publish Folder Launcher test APK
 
 on:
   workflow_dispatch:
