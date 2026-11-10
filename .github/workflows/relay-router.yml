@@ -1,4 +1,4 @@
-name: Event-kind relay router
+name: Relay-router routing, protocol boundary and demo checks
 on:
   push:
     branches: [main]

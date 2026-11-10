@@ -98,7 +98,7 @@ Do not put these values in a tracked file, a command echoed into logs, or a pull
 
 ## CI option
 
-The Gradle configuration already accepts the four `FOLDER_LAUNCHER_*` environment variables. If a signed release workflow is added later, the keystore must be supplied through repository secrets, decoded to a temporary path with restricted permissions, and removed after the build. The current `Build Folder Launcher APK` workflow remains debug-only; no release workflow or signing secret is added by this change.
+The Gradle configuration already accepts the four `FOLDER_LAUNCHER_*` environment variables. If a signed release workflow is added later, the keystore must be supplied through repository secrets, decoded to a temporary path with restricted permissions, and removed after the build. The current `Build, verify and publish Folder Launcher test APK` workflow remains debug-only; no release workflow or signing secret is added by this change.
 
 ## Verification performed for this setup
 

@@ -89,7 +89,7 @@ Android Studio: open `native/android-app` (or `android-app` inside the Android s
 
 ## GitHub-built APK stored in the repository
 
-The owner requested an intentionally **checked-in testing APK**, as an exception to the normal generated-file ignore policy. The [Build Folder Launcher APK workflow](../../.github/workflows/build-folder-launcher-apk.yml) runs when the native Android project changes on `main` or when started manually through GitHub Actions. It builds with Java 17, Gradle 8.9, and Android SDK 35; verifies the APK signature and package name; uploads a downloadable Actions artifact; and commits the verified binary and checksums to:
+The owner requested an intentionally **checked-in testing APK**, as an exception to the normal generated-file ignore policy. The [Build, verify and publish Folder Launcher test APK workflow](../../.github/workflows/build-folder-launcher-apk.yml) runs when the native Android project changes on `main` or when started manually through GitHub Actions. It builds with Java 17, Gradle 8.9, and Android SDK 35; verifies the APK signature and package name; uploads a downloadable Actions artifact; and commits the verified binary and checksums to:
 
 - [`artifacts/folder-launcher/FolderLauncher.apk`](../../artifacts/folder-launcher/FolderLauncher.apk)
 - [`artifacts/folder-launcher/CHECKSUMS.txt`](../../artifacts/folder-launcher/CHECKSUMS.txt)

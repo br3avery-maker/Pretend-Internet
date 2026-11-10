@@ -11,7 +11,7 @@ Build small, independently runnable, understandable, testable, skinnable mini-ap
 - `skins/`: optional theme token sets.
 - `docs/`: cross-project documentation as needed.
 - `scripts/`: narrow reproducible maintenance utilities.
-- `.github/workflows/`: small automated checks.
+- `.github/workflows/`: small automated checks. A workflow's name states what its steps actually execute, and job ids stay stable so required-check names do not move.
 
 An app must remain independently buildable. External GitHub repositories may comply without moving into this monorepo. Keep generated outputs, dependencies, APKs and temporary extraction trees out of source Git; use releases or dedicated asset storage with checksums.
 

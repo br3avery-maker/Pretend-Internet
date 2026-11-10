@@ -1,4 +1,4 @@
-name: Nsite archive
+name: Nsite archive engine, mobile directory and sandboxed screenshot checks
 on:
   push:
     branches: [main]
