@@ -6,6 +6,10 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "build": "sh build.sh",
-    "test:browser:prepare": "node test/prepare-browser.mjs"
+    "test:browser:prepare": "node test/prepare-browser.mjs",
+    "test:pipeline": "node test/pipeline-ci.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
   }
 }
