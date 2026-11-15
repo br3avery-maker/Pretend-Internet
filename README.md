@@ -2,6 +2,8 @@
 
 Small, independent, self-explaining mini-apps; no mandatory shared runtime.
 
+**Current nsite-directory scope:** Metadata-only discovery and classification from Nostr event information and existing records. **Do not download remote nsite pages, assets, ZIPs or site trees to determine what a site is, generate previews, or populate the directory.** Existing archive/download implementations are separate historical capabilities, not the default discovery workflow. Any future content download requires a separate explicit owner decision. See [AGENTS.md](AGENTS.md) and [the scope correction](https://github.com/br3avery-maker/Pretend-Internet/issues/41).
+
 **State:** Development standards and template are drafts. No installed WebToApp APK is verified from this repository.
 
 - [Development standards](DEVELOPMENT.md)
