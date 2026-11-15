@@ -1,5 +1,13 @@
 # Working rules for coding agents
 
+## Nsite discovery boundary — current owner requirement (2026-11-14)
+
+**A nsite directory is not an nsite downloader.** Discover, inventory, group, search and classify publications from bounded Nostr event metadata, declared file paths and hashes, publisher/namespace/version relationships, and available provenance. **Do not automatically fetch nsite HTML, assets, ZIPs, pages, or entire site trees to identify, classify, enrich, preview, screenshot, or index them.** Neither "fetch a representative page" nor "metadata first, download later" is an acceptable default. Leave unknown classifications unknown when metadata is insufficient. Do not silently initiate network site retrieval through a background queue or a directory/browse action.
+
+Downloading remote site content is **outside the current directory workflow**. Its possible future use requires the owner's separate, explicit direction; do not treat it as an implementation prerequisite or infer permission from legacy archive code. Reading relay publication metadata is not permission to retrieve the referenced site bytes. Do not change or disable historical archival implementations merely because they exist; treat them as distinct existing tools pending an explicit product decision.
+
+See [original directory/curation clarification](https://github.com/br3avery-maker/Pretend-Internet/issues/41) and [generated Android scope clarification](https://github.com/br3avery-maker/piShell-/issues/1). This documents requirements; it does not authorize an implementation change.
+
 Read [DEVELOPMENT.md](DEVELOPMENT.md) and [ROADMAP.md](ROADMAP.md) before changing an app. The broader standards remain draft; do not promote older proposals or prototypes into policy.
 
 1. Preserve the current task, proven working behavior, and protected scope. A repair does not authorize unrelated redesign.
