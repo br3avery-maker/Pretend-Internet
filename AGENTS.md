@@ -1,5 +1,7 @@
 # Working rules for coding agents
 
+> **Repository-import orientation:** Read [PROJECT.md](PROJECT.md) before treating the launcher, Pocket Counter, mini-app standards, or nsite archive as the whole Pretend Internet. It distinguishes product intent from implemented components, current corrections from exploratory ideas, and existing workstream owners. Do not upload private historical conversations to this public repository.
+
 ## Nsite discovery boundary — current owner requirement (2026-11-14)
 
 **A nsite directory is not an nsite downloader.** Discover, inventory, group, search and classify publications from bounded Nostr event metadata, declared file paths and hashes, publisher/namespace/version relationships, and available provenance. **Do not automatically fetch nsite HTML, assets, ZIPs, pages, or entire site trees to identify, classify, enrich, preview, screenshot, or index them.** Neither "fetch a representative page" nor "metadata first, download later" is an acceptable default. Leave unknown classifications unknown when metadata is insufficient. Do not silently initiate network site retrieval through a background queue or a directory/browse action.
