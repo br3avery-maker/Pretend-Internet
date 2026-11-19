@@ -46,17 +46,12 @@ The existing [Nsite Archive](apps/nsite-archive/README.md) and [Node archive too
 
 Do not claim `main` already assembles all those experiences into a usable phone Internet. An on-device, end-to-end visit/search/open/persist/revisit test has not been established for the complete experience.
 
-## How to judge a meaningful next slice
-
-Choose **one recovered user workflow** in an existing source artifact (for example: import a user-selected local HTML site or ZIP and actually open its linked assets; resume an already-imported book; continue a local playlist; or navigate between two independent experiences). Record expected behavior, current failure, smallest repair, exact file/revision, local/browser checks, and phone verification where needed. Do not initiate remote nsite downloading to classify a site. Do not make an app catalog a replacement for fixing actual app behavior.
-
 ## Cold-import comprehension checks
 
 Before coding after a repository-only import, answer all of these from cited source:
 - **What is the intended experience?** The answer must not be “a counter” or “an nsite archive.”
 - **What does this checkout actually deliver?** Distinguish source trees, current root UI and target-tested apps.
 - **What is explicitly prohibited?** Especially automatic remote content retrieval for nsite discovery.
-- **What is the next smallest useful work item?** Point to an existing issue/source and a verifiable user action, without launching a new competing product.
 
 If any cannot be answered reliably, inspect original issue/source evidence before proposing changes.
 
