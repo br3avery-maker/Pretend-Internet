@@ -11,7 +11,7 @@
 ## Stage 0 — Decide standards
 
 - [ ] Review [DEVELOPMENT.md](DEVELOPMENT.md) and identify any rules to change before treating it as binding.
-- [ ] Decide the **app manifest**: ID, name, version, status, purpose, entry point, build/run, storage/network/permissions, help, limitations. Keep WebToApp-specific settings separate; `app.json` is our contract, not a WebToApp-native format.
+- [ ] Decide the **smallest app manifest**: ID, name, version, status, purpose, entry point, build/run, storage/network/permissions, help, limitations. Keep WebToApp-specific settings separate; `app.json` is our contract, not a WebToApp-native format.
 - [ ] Decide which requirements are **mandatory** versus optional or platform-specific. Do **not** force a server, API, package manager or framework on a static mini-app.
 - [ ] Define semantic CSS tokens and the **accessibility/mobile behavior**; skins modify presentation, not function.
 - [ ] Specify the in-app **self-explanation gate**: what it is, first action, what works, what does not, where data goes, and persistent access to Help.
