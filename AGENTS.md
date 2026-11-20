@@ -2,6 +2,12 @@
 
 > **Repository-import orientation:** Read [PROJECT.md](PROJECT.md) before treating the launcher, Pocket Counter, mini-app standards, or nsite archive as the whole Pretend Internet. It distinguishes product intent from implemented components, current corrections from exploratory ideas, and existing workstream owners. Do not upload private historical conversations to this public repository.
 
+## Portfolio-first cold import
+
+This repository is the **umbrella portfolio home**, not proof that the root counter, any nsite archive, any one Android shell or Studio constitutes the whole product. After [PROJECT.md](PROJECT.md), read [Origins](docs/ORIGINS.md), [Workstreams](docs/WORKSTREAMS.md), [MVP gate](docs/MVP.md) and [ROADMAP.md](ROADMAP.md) before selecting a scope. **Melody's public contribution is documented without releasing private transcript or personal identity details.** Do not infer seven release versions or a seven-step mandatory build order from the workstream labels.
+
+For a new task, identify the actual owning app/repository/issue and current user correction. First recover and verify real working behavior, then connect pieces if it helps an actual user. Use [portfolio issue #27](https://github.com/br3avery-maker/Pretend-Internet/issues/27) for the whole-project direction and [issue #3](https://github.com/br3avery-maker/Pretend-Internet/issues/3) for recovery. Keep build/runtime observations and release status distinct. This documentation change **does not authorize** any implementation, remote crawler, migration or publication.
+
 ## Nsite discovery boundary — current owner requirement (2026-11-14)
 
 **A nsite directory is not an nsite downloader.** Discover, inventory, group, search and classify publications from bounded Nostr event metadata, declared file paths and hashes, publisher/namespace/version relationships, and available provenance. **Do not automatically fetch nsite HTML, assets, ZIPs, pages, or entire site trees to identify, classify, enrich, preview, screenshot, or index them.** Neither "fetch a representative page" nor "metadata first, download later" is an acceptable default. Leave unknown classifications unknown when metadata is insufficient. Do not silently initiate network site retrieval through a background queue or a directory/browse action.

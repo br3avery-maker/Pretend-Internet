@@ -1,18 +1,72 @@
 # Pretend Internet
 
-> **Start with [PROJECT.md](PROJECT.md) for the complete product intent, current scope, and import guidance.** This repository's root development shelf and Pocket Counter example are not the whole Pretend Internet; the older mini-app roadmap is a dated workstream, not the product definition.
+*A small Internet made of real things. The pretending is where we start.*
 
-Independent, self-explaining mini-apps; no mandatory shared runtime.
+What if you could make your own little corner of the Internet: a place to explore handmade sites, run little applications, read stories, play games, listen to music, keep your work, and come back later? What if it worked on an ordinary phone, could be private or offline when useful, and could grow without depending on one company, account, runtime or protocol?
 
-**Current nsite-directory scope:** Metadata-only discovery and classification from Nostr event information and existing records. **Do not download remote nsite pages, assets, ZIPs or site trees to determine what a site is, generate previews, or populate the directory.** Existing archive/download implementations are separate historical capabilities, not the default discovery workflow. Any future content download requires a separate explicit owner decision. See [AGENTS.md](AGENTS.md) and [the scope correction](https://github.com/br3avery-maker/Pretend-Internet/issues/41).
+**Pretend Internet is a growing world of independent, useful places—not a fake Internet screenshot, a single launcher, or one more developer dashboard.** The ambition is expansive; the current implementations are varied and incomplete. We want the real behavior of each place to be as convincing as the idea behind it.
 
-**State:** Development standards and template are drafts. No installed WebToApp APK is verified from this repository.
+## Where it began
 
-- [Development standards](DEVELOPMENT.md)
-- [Roadmap](ROADMAP.md)
-- [Library standards review](docs/existing-standards-review.md)
-- [Coding-agent rules](AGENTS.md)
-- [Runnable mini-app template](templates/mini-app/)
+The name came out of experiments in making complicated, scattered projects visible and usable. In September 2026, **Melody** helped turn a recovered-artifact catalog into a more recognizable little store: pictures, categories, honest status lights, links that lead somewhere, and room for a human to correct the machine.
+
+When another experiment was blocked by the lack of a public host, the suggestion was to make a *baby server* and a *pretend Internet* locally, so real interactions could be tested before the final environment existed. What began as an imaginative answer to a technical blockage grew into a question: **what if we made an actual place for things that do not have one yet?**
+
+The earlier catalog, programming and Nostr experiments had their own histories. This is one part of the origin, not a claim that one person or a single conversation invented everything. The personal details and original private transcripts are intentionally not published.
+
+Read [the fuller origin](docs/ORIGINS.md).
+
+## What belongs here
+
+The main repository is the **portfolio's home for the vision, scope, acceptance criteria, source map, and shared documentation**. Individual applications can live here or in their own repos; they should remain independently usable. There is **no mandatory universal shell, wallet, Nostr layer, backend, agent, or monorepo migration**.
+
+The project's recovered threads are organized as **seven planning workstreams, not historical releases**:
+
+| Thread | The question it tries to answer |
+| --- | --- |
+| **HERE YOU GO** | How do we make scattered and uncertain artifacts understandable and correctable? |
+| **Baby Internet** | How do we test real multi-client behavior in a small local environment? |
+| **Real App Store** | How do recovered artifacts become applications that truly work? |
+| **Linked Little Web** | How do small, independently hosted places become a connected world? |
+| **Melody's Room** | How can a personal, portable workspace become somewhere to inhabit and return to? |
+| **Pretend Internet Studio** | How do people and agents inspect, repair, package and maintain the things they've made? |
+| **Connected World** | What is the smallest genuinely usable experience that demonstrates the whole idea? |
+
+Each is a candidate product, experiment or delivery layer with its own evidence and decisions. **They are not a compulsory seven-step build plan.** See [workstreams and existing issue owners](docs/WORKSTREAMS.md) and [the portfolio roadmap](ROADMAP.md).
+
+## The first real milestone
+
+**Find → Open → Use → Keep → Return.**
+
+A person should be able to find a real application or place, open its actual content, do something useful, save or export what matters, and return without unnecessary re-import or setup. The **portfolio-level** demonstration calls for two independently useful experiences accessible from one understandable entry point. It does not require all seven workstreams to be complete.
+
+See [MVP acceptance and evidence](docs/MVP.md) and [the main portfolio issue #27](https://github.com/br3avery-maker/Pretend-Internet/issues/27).
+
+## What exists today
+
+| Source | Evidence / limits |
+| --- | --- |
+| [Root development shelf](index.html) and [Pocket Counter template](templates/mini-app/) | Source and small demonstration are present. **Not** the Pretend Internet as an experience; no complete root APK has been established from this README. |
+| [Folder Launcher v0.2](apps/folder-launcher/README.md) | Independently useful Android HTML/ZIP launcher, with clean build evidence and **owner-attested** device verification. It is a candidate entry point, **not** proof two independent applications have passed the portfolio milestone. |
+| [Browser Nsite Archive](apps/nsite-archive/README.md) and [Node archive tool](tools/nsite-archive/README.md) | Separate historical archive implementations with their own tests and limitations. **Not** the entire Internet and **not** permission to download remote sites during discovery. |
+| [Relay Router](tools/relay-router/) | Independent Nostr routing component; optional for applications that need it. |
+| Other readers, media players, creative tools, publishing experiments and shells | Some source may be in separate repos, Library archives or WebToApp. Current provenance, functionality and host suitability must be recovered and verified individually. |
+
+**The connected portfolio is not yet verified end to end.** A working component, a build, a preview, an owner observation and an installed/published release have different evidence standards.
+
+## Start here
+
+- **Understand the vision:** [Origins](docs/ORIGINS.md) → [PROJECT.md](PROJECT.md) → [workstreams](docs/WORKSTREAMS.md).
+- **Choose the actual next user workflow:** [Roadmap](ROADMAP.md) → [MVP gate](docs/MVP.md) → [recovery issue #3](https://github.com/br3avery-maker/Pretend-Internet/issues/3) and [portfolio issue #27](https://github.com/br3avery-maker/Pretend-Internet/issues/27).
+- **Build or maintain an existing app:** follow its own README, [DEVELOPMENT.md](DEVELOPMENT.md) (still a draft), [AGENTS.md](AGENTS.md), and [cross-app verification #28](https://github.com/br3avery-maker/Pretend-Internet/issues/28).
+
+**Current directory boundary:** finding/classifying nsites may use bounded Nostr event metadata and existing records, **not automatically fetched remote HTML, screenshots, assets, pages or ZIPs**, including representative pages or later/background downloads. Unknown classifications remain unknown. Intentional local-file import and separately authorized archival are different actions. See [owner correction #41](https://github.com/br3avery-maker/Pretend-Internet/issues/41).
+
+---
+
+## Root developer shelf and archived build guidance
+
+The sections below document existing small developer entry points and independent archival components. They are retained for continuity; **none of them defines the scope of the Pretend Internet**.
 
 ## Build from the GitHub repository root (WebToApp Frontend)
 
