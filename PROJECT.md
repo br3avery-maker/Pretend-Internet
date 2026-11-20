@@ -10,6 +10,18 @@ Pretend Internet is intended to feel like a **browsable, local-first world** mad
 
 **The root `index.html` is currently a development shelf.** The Pocket Counter demonstrates a tiny standalone mini-app; **it is not the product definition, complete app portfolio, or a satisfactory destination experience**. The October 21 [ROADMAP.md](ROADMAP.md) is a dated, narrower mini-app standards plan. [DEVELOPMENT.md](DEVELOPMENT.md) explicitly labels its standards draft. Do not infer the full product scope from either document.
 
+## What this repository is responsible for
+
+This is the **canonical public home for Pretend Internet as a whole**: why it exists, which experiences belong to the portfolio, the boundaries between independent workstreams, the success criteria, and pointers to the actual source/issue owners. **Canonical portfolio documentation does not make this repository the compulsory code destination** for every app, personal room, nsite, publisher or tool.
+
+- The **idea and origin** are recorded in [docs/ORIGINS.md](docs/ORIGINS.md): Melody's interface and baby-Internet contributions are credited in a public-safe paraphrase, while private transcripts and personal background stay private.
+- The **portfolio map** is [docs/WORKSTREAMS.md](docs/WORKSTREAMS.md): HERE YOU GO (artifact catalog), Baby Internet (local testnet), Real App Store (verified apps), Linked Little Web (independent sites), Melody's Room (personal workspace), Studio (maintenance workbench), and Connected World (first portfolio milestone). These are proposed **workstream names**, not shipped versions or a required sequence.
+- The **smallest complete outcome** is [docs/MVP.md](docs/MVP.md): **Find → Open → Use → Keep → Return**, first for an independently useful app, then across **two** independently useful experiences sharing an understandable entry point.
+- The **current delivery sequence** is [ROADMAP.md](ROADMAP.md) and [issue #27](https://github.com/br3avery-maker/Pretend-Internet/issues/27). The October 21 mini-app checklist is retained as a **dated sub-workstream** rather than mistaken for the product.
+- The **recovery and verification** work lives in [#3](https://github.com/br3avery-maker/Pretend-Internet/issues/3), [#11](https://github.com/br3avery-maker/Pretend-Internet/issues/11) and [#28](https://github.com/br3avery-maker/Pretend-Internet/issues/28); use each owner rather than duplicating them.
+
+No historical title, prototype or Assistant proposal alone establishes a frozen MVP architecture. All seven threads can remain distinct, optional and differently mature; a root folder launcher, nsite archive, personal room or Studio is not itself the entire Pretend Internet.
+
 ## What an imported coding agent should do first
 
 1. Read this file, [AGENTS.md](AGENTS.md), [README.md](README.md), and the relevant open/closed issue and current source before making design or implementation choices.
