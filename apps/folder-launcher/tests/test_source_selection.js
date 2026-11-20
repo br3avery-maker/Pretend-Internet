@@ -15,7 +15,10 @@ const bootEndMarker = '})().catch(e=>status(e.message));';
 const bootEnd = source.indexOf(bootEndMarker, bootStart);
 assert.ok(start >= 0 && end > start && fileListStart >= 0 && fileListEnd > fileListStart);
 assert.ok(bootStart >= 0 && bootEnd > bootStart);
-const fragment = source.slice(start, end) + '\n' + source.slice(fileListStart, fileListEnd);
+const importStart = source.indexOf('async function dbImport(', start);
+const storeStart = source.indexOf('async function storeFiles(', importStart);
+assert.ok(importStart > start && storeStart > importStart);
+const fragment = source.slice(start, importStart) + source.slice(storeStart, end) + '\n' + source.slice(fileListStart, fileListEnd);
 const startup = source.slice(bootStart, bootEnd + bootEndMarker.length);
 
 function harness(savedSource, preloaded = false) {
@@ -36,6 +39,10 @@ function harness(savedSource, preloaded = false) {
     dbPut: async (store, key, value) => (store === 'settings' ? settings : imports).set(key, value),
     dbGet: async (store, key) => (store === 'settings' ? settings : imports).get(key),
     dbAll: async () => [...imports.values()],
+    dbImport: async files => {
+      for (const file of files) imports.set(file.name.toLowerCase(), {name: file.name, file});
+      settings.set('activeSource', 'imports');
+    },
     buildCatalog: async files => files,
     paint() {}, renderSource() {}, status() {}, closeSettings() {},
     window: {showDirectoryPicker: async () => folderHandle},
