@@ -1,4 +1,34 @@
-# Pretend Internet — Next Steps Checklist
+# Pretend Internet — portfolio roadmap
+
+**Status: current portfolio direction, November 2026; proposals remain unapproved until separately scoped.** This document is a map of intended outcomes and actual issue owners, **not** a record that the whole product has shipped. [PROJECT.md](PROJECT.md) owns the broad definition; [portfolio issue #27](https://github.com/br3avery-maker/Pretend-Internet/issues/27) owns the current delivery coordination.
+
+## What success looks like
+
+**A small, real Internet made of useful independent places.** A person can **Find → Open → Use → Keep → Return** to real content on a supported target. The first portfolio demonstration should make **two** independently useful experiences findable from an understandable entry point. The entry point can be an existing launcher or links; no universal shell or mandatory network is required. See [MVP.md](docs/MVP.md).
+
+## Portfolio delivery sequence
+
+1. **Recover existing app candidates — evidence first.** Follow [#3](https://github.com/br3avery-maker/Pretend-Internet/issues/3): find real source for at least two candidates, inspect provenance and reuse, reproduce actual primary tasks, and classify what works/fails/was never tested. Don't create a replacement app store, shell or archive just to avoid source archaeology.
+2. **Make one useful application genuinely work.** Choose a real reader, player, creative app, file opener, publisher or similar candidate; complete its user task and save/reopen path; run its target-specific tests. Log the chosen source, exact failure and repair with its existing issue owner. A counter demo does not satisfy this stage.
+3. **Reuse a verified doorway rather than building another.** Investigate [Folder Launcher #11](https://github.com/br3avery-maker/Pretend-Internet/issues/11) as an optional front door; it has build evidence and owner-attested device validation, but no independent proof of the complete portfolio workflow. Confirm navigation/state with a selected real app.
+4. **Connect two independent working places.** Satisfy [the MVP gate](docs/MVP.md) for both apps; let an ordinary phone user find, open, use, save and return to each through an understandable entry point. Record the exact browser/APK/network target, results and missing observations under [#27](https://github.com/br3avery-maker/Pretend-Internet/issues/27) and [#28](https://github.com/br3avery-maker/Pretend-Internet/issues/28).
+5. **Document and maintain.** Update project statuses, user-facing Help, run/build commands, sources, hashes, version/lineage, evidence and next repair in the **owning** app repository/issue; maintain this portfolio map without duplicating entire projects.
+
+These are **proposed next operations**, not actions already executed by this documentation edit. Any individual application changes, publishing, deployment, bulk import, destructive cleanup, identity or infrastructure changes require their appropriate scope and authority.
+
+## Parallel independent ideas, not blockers
+
+[Seven workstreams](docs/WORKSTREAMS.md) track the artifact catalog (**HERE YOU GO**), local baby Internet, real app store, linked little sites, Melody's personal room, Studio workbench, and the connected-world demonstration. They are different layers of the story and may evolve independently; **none is a mandatory prerequisite to the others**.
+
+**Directory discovery is metadata-only:** don't auto-download remote nsite HTML, screenshots, ZIPs, assets or site trees as part of discovery, classification, enrichment or preview, even as a later background stage. See [#41](https://github.com/br3avery-maker/Pretend-Internet/issues/41). Historical archive code is separate.
+
+**Current evidence:** this repository's root launcher is a developer shelf and Pocket Counter example. Folder Launcher is independently built and owner-attested on Android, not a complete verified portfolio. The two-application end-to-end gate is **not yet passed**.
+
+---
+
+## Historical mini-app standards checklist — October 21, 2026
+
+The remainder is the original narrower development-standards workstream, retained for traceability. It **does not define or replace the portfolio's canonical vision, stages or acceptance test**. Statuses below are those recorded in that historical plan, not newly reverified results.
 
 **Status:** proposed work queue, not a record of completed work  
 **Source of standards:** [DEVELOPMENT.md](DEVELOPMENT.md) (draft v0.1)  
