@@ -693,7 +693,10 @@
           recentVisits: state.recentVisits,
           bookmarks: state.bookmarks,
         }));
-      } catch { /* ignore */ }
+        return true;
+      } catch {
+        return false;
+      }
     }
 
     function renderRecent() {
@@ -826,9 +829,11 @@
         removeBtn.setAttribute('aria-label', `Remove bookmark ${bm.title}`);
         removeBtn.addEventListener('click', () => {
           state.bookmarks = state.bookmarks.filter((item) => item.id !== bm.id);
-          saveState();
+          const persisted = saveState();
           renderBookmarks();
-          $('bookmarkStatus').textContent = `Removed "${bm.title}".`;
+          $('bookmarkStatus').textContent = persisted
+            ? `Removed "${bm.title}".`
+            : `Removed "${bm.title}" for this session only. Local storage is unavailable.`;
         });
 
         li.append(info, removeBtn);
@@ -901,11 +906,13 @@
         return;
       }
       state.bookmarks.unshift(result.bookmark);
-      saveState();
+      const persisted = saveState();
       $('bmTitle').value = '';
       $('bmUrl').value = '';
       $('bmNote').value = '';
-      $('bookmarkStatus').textContent = `Saved "${result.bookmark.title}" to your local shelf.`;
+      $('bookmarkStatus').textContent = persisted
+        ? `Saved "${result.bookmark.title}" to your local shelf.`
+        : `Added "${result.bookmark.title}" for this session only. Local storage is unavailable.`;
       renderBookmarks();
     });
 
