@@ -43,7 +43,14 @@ dist/portal-core.mjs
 dist/templates/mini-app/app.json
 dist/templates/mini-app/index.html
 dist/templates/mini-app/skin.css'
-actual="$(cd dist && find . -type f | sed 's|^\./|dist/|' | sort)"
+# The standalone archive build owns its runtime asset set.
+test -f apps/nsite-archive/dist/index.html
+expected="$( {
+  printf '%s\n' "$expected"
+  cd apps/nsite-archive/dist
+  find . -type f | sed 's|^\./|dist/apps/nsite-archive/|'
+} | LC_ALL=C sort)"
+actual="$(cd dist && find . -type f | sed 's|^\./|dist/|' | LC_ALL=C sort)"
 if [ "$actual" != "$expected" ]; then
   printf 'FAIL: unexpected dist membership\n--- expected ---\n%s\n--- actual ---\n%s\n' "$expected" "$actual" >&2
   exit 1
