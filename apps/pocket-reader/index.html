@@ -86,6 +86,8 @@
         <button type="button" class="primary" id="nextChapterBtn">Next →</button>
       </div>
     </section>
+    <p class="status-line" id="storageWarning" role="status" hidden
+      style="position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 19; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);"></p>
   </main>
 
   <div id="pasteModal" class="modal-backdrop" hidden>
@@ -190,9 +192,13 @@
           fontSize: state.fontSize,
           fontFace: state.fontFace,
         }));
+        $('storageWarning').hidden = true;
+        $('storageWarning').textContent = '';
         if (successMessage) setStatus(successMessage);
       } catch {
-        setStatus('Storage quota reached or unavailable; changes stay in memory.');
+        const warning = $('storageWarning');
+        warning.hidden = false;
+        warning.textContent = 'Storage quota reached or unavailable; changes stay in memory.';
       }
     }
 
