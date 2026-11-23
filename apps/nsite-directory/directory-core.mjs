@@ -266,7 +266,8 @@ export async function analyzeEventsMetadataOnly(rawEvents) {
     const topics = allTagValues(latest.tags, 't');
     const namespace = latest.kind === 35128 ? (firstTagValue(latest.tags, 'd') || '(empty d-tag)') : 'root';
     const fingerprintInput = files.map((f) => `${f.path}=${f.hash}`).join('\n');
-    const manifestFingerprint = files.length ? await sha256Hex(fingerprintInput) : 'empty-manifest';
+    const manifestFingerprint = files.length && files.every((file) => HEX_64.test(file.hash))
+      ? await sha256Hex(fingerprintInput) : null;
     const metaClass = classifyFromMetadataOnly({ title, description, topics, files });
 
     publications.push({
@@ -297,7 +298,8 @@ export async function analyzeEventsMetadataOnly(rawEvents) {
   for (const [, bucket] of legacyBuckets.entries()) {
     const files = [...bucket.files.values()].sort((a, b) => a.path.localeCompare(b.path));
     const fingerprintInput = files.map((f) => `${f.path}=${f.hash}`).join('\n');
-    const manifestFingerprint = files.length ? await sha256Hex(fingerprintInput) : 'empty-manifest';
+    const manifestFingerprint = files.length && files.every((file) => HEX_64.test(file.hash))
+      ? await sha256Hex(fingerprintInput) : null;
     const metaClass = classifyFromMetadataOnly({ title: '', description: '', topics: [], files });
     publications.push({
       id: `${bucket.pubkey.slice(0, 12)}:legacy`,
@@ -323,6 +325,7 @@ export async function analyzeEventsMetadataOnly(rawEvents) {
   // Stack exact-content deployments by manifestFingerprint across publishers
   const stacksByFingerprint = new Map();
   for (const pub of publications) {
+    if (!pub.manifestFingerprint) continue;
     if (!stacksByFingerprint.has(pub.manifestFingerprint)) {
       stacksByFingerprint.set(pub.manifestFingerprint, []);
     }
