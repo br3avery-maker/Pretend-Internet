@@ -174,7 +174,7 @@
       const bar = $('tagBar');
       bar.textContent = '';
       const tags = collectTags(state.notes);
-      if (!tags.length) return;
+      if (!tags.length && !state.tag) return;
 
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
