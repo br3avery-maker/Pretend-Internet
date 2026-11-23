@@ -25,7 +25,21 @@ if [ -e dist/old-build-only.txt ]; then
 fi
 
 # Exact expected runtime asset set; no more, no fewer.
-expected='dist/index.html
+expected='dist/apps/folder-launcher/web2app/index.html
+dist/apps/nsite-directory/app.json
+dist/apps/nsite-directory/directory-core.mjs
+dist/apps/nsite-directory/index.html
+dist/apps/nsite-directory/skin.css
+dist/apps/pocket-notes/app.json
+dist/apps/pocket-notes/index.html
+dist/apps/pocket-notes/notes-core.mjs
+dist/apps/pocket-notes/skin.css
+dist/apps/pocket-reader/app.json
+dist/apps/pocket-reader/index.html
+dist/apps/pocket-reader/reader-core.mjs
+dist/apps/pocket-reader/skin.css
+dist/index.html
+dist/portal-core.mjs
 dist/templates/mini-app/app.json
 dist/templates/mini-app/index.html
 dist/templates/mini-app/skin.css'

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "0.1",
+  "id": "pocket-reader",
+  "name": "Pocket Reader",
+  "version": "0.1.0",
+  "status": "testing",
+  "summary": "Offline Markdown, plain-text, and sanitized HTML chapter reader with swipe navigation, focus mode, and saved reading progress.",
+  "entry": "index.html",
+  "offline": true,
+  "storage": "localStorage",
+  "permissions": [],
+  "help": {
+    "purpose": "Read local Markdown, text, and HTML documents in chapters without accounts or network access.",
+    "start": "Import a local .md, .txt, or .html file, paste text, or load the synthetic sample reading.",
+    "limitations": "HTML is stripped to safe text and headings; EPUB/PDF binaries are not parsed yet; browser-tested only, not an installed Android APK release.",
+    "data": "Readings, bookmarks, reading position, and skin stay in browser localStorage on this device."
+  }
+}

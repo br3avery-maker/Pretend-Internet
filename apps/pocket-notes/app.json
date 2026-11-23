@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "0.1",
+  "id": "pocket-notes",
+  "name": "Pocket Notes",
+  "version": "0.1.0",
+  "status": "testing",
+  "summary": "Offline local-first notebook with search, tag filters, safe Markdown preview, pinning, undo delete, and portable JSON/Markdown backups.",
+  "entry": "index.html",
+  "offline": true,
+  "storage": "localStorage",
+  "permissions": [],
+  "help": {
+    "purpose": "Capture, organize, search, and export personal notes completely offline.",
+    "start": "Click New note, add a title, optional tags, and text, or toggle Preview to read formatted Markdown.",
+    "limitations": "Text and Markdown only; no image uploads or cloud sync; browser-tested only, not an installed Android APK release.",
+    "data": "All notes and skin preferences stay in browser localStorage on this device. Export JSON or Markdown for backups."
+  }
+}

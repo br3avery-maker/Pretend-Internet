@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "description": "Static WebToApp frontend with no JavaScript build-runtime dependency",
   "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
     "build": "sh scripts/build-frontend.sh",
-    "check": "sh scripts/check-frontend.sh"
+    "check": "sh scripts/check-frontend.sh",
+    "lint": "node --check server.mjs && node --check portal-core.mjs && node --check apps/pocket-reader/reader-core.mjs && node --check apps/pocket-notes/notes-core.mjs && node --check apps/nsite-directory/directory-core.mjs",
+    "test": "node --test tests/pretend-internet.test.mjs"
   }
 }
