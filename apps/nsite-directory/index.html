@@ -137,14 +137,20 @@
       }
     }
 
-    async function recompute() {
-      state.analysis = await analyzeEventsMetadataOnly(state.events);
+    let datasetRevision = 0;
+    let inputRevision = 0;
+
+    async function recompute(revision = datasetRevision) {
+      const analysis = await analyzeEventsMetadataOnly(state.events);
+      if (revision !== datasetRevision) return false;
+      state.analysis = analysis;
       const s = state.analysis.summary;
       $('statPubs').textContent = String(s.publicationCount);
       $('statStacks').textContent = String(state.analysis.stacks.length);
       $('statValidIds').textContent = `${s.idMatchedCount} / ${s.totalEvents}`;
       $('statUnknown').textContent = String(s.unknownClassificationCount);
       renderView();
+      return true;
     }
 
     function updateTabButtons() {
@@ -220,7 +226,7 @@
 
         const provenance = document.createElement('p');
         provenance.className = 'meta-row mono';
-        provenance.textContent = `publisher ${pub.pubkey.slice(0, 16)}… · canonical ID ${pub.idMatches ? 'matched' : 'mismatch'} · sig verified: false · manifest ${pub.manifestFingerprint.slice(0, 16)}…`;
+        provenance.textContent = `publisher ${pub.pubkey.slice(0, 16)}… · canonical ID ${pub.idMatches ? 'matched' : 'mismatch'} · sig verified: false · manifest ${pub.manifestFingerprint ? `${pub.manifestFingerprint.slice(0, 16)}…` : 'unknown (incomplete hashes)'}`;
 
         card.append(h2, meta, desc, provenance);
 
@@ -366,21 +372,27 @@
       const file = e.target.files?.[0];
       e.target.value = '';
       if (!file) return;
-      const result = parseJsonEventsInput(await file.text());
+      const inputId = ++inputRevision;
+      const input = await file.text();
+      if (inputId !== inputRevision) return;
+      const result = parseJsonEventsInput(input);
       if (result.error) {
         setStatus(result.error);
         return;
       }
       state.events = result.events;
       saveEvents();
-      await recompute();
+      if (!await recompute(++datasetRevision)) return;
       setStatus(`Loaded ${result.events.length} events from "${file.name}" (metadata-only, zero remote fetches).`);
     });
 
     $('loadFixtureBtn').addEventListener('click', async () => {
-      state.events = await getSyntheticFixtureEvents();
+      const inputId = ++inputRevision;
+      const events = await getSyntheticFixtureEvents();
+      if (inputId !== inputRevision) return;
+      state.events = events;
       saveEvents();
-      await recompute();
+      if (!await recompute(++datasetRevision)) return;
       setStatus(`Loaded ${state.events.length} synthetic fixture events with canonical SHA-256 IDs.`);
     });
 
@@ -398,14 +410,16 @@
       state.events = result.events;
       saveEvents();
       $('pastePanel').hidden = true;
-      await recompute();
+      ++inputRevision;
+      if (!await recompute(++datasetRevision)) return;
       setStatus(`Inspected ${result.events.length} pasted events (metadata-only).`);
     });
 
     $('clearDataBtn').addEventListener('click', async () => {
+      ++inputRevision;
       state.events = [];
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-      await recompute();
+      if (!await recompute(++datasetRevision)) return;
       setStatus('Cleared local metadata workspace.');
     });
 
