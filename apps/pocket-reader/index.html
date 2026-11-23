@@ -182,7 +182,7 @@
       }
     }
 
-    function saveState() {
+    function saveState(successMessage) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           books: state.books,
@@ -190,6 +190,7 @@
           fontSize: state.fontSize,
           fontFace: state.fontFace,
         }));
+        if (successMessage) setStatus(successMessage);
       } catch {
         setStatus('Storage quota reached or unavailable; changes stay in memory.');
       }
@@ -271,8 +272,7 @@
         delBtn.addEventListener('click', () => {
           state.books = state.books.filter((item) => item.id !== book.id);
           if (state.activeBookId === book.id) state.activeBookId = null;
-          saveState();
-          setStatus(`Removed "${book.title}".`);
+          saveState(`Removed "${book.title}".`);
           render();
         });
 
@@ -336,12 +336,12 @@
       }
     }
 
-    function openBook(id) {
+    function openBook(id, successMessage) {
       const book = state.books.find((b) => b.id === id);
       if (!book) return;
       book.lastOpenedAt = Date.now();
       state.activeBookId = book.id;
-      saveState();
+      saveState(successMessage);
       render();
       window.scrollTo({ top: book.scrollTop || 0, behavior: 'auto' });
     }
@@ -374,8 +374,7 @@
         added++;
       }
       if (added > 0) {
-        saveState();
-        setStatus(`Imported ${added} ${added === 1 ? 'reading' : 'readings'} into your local shelf.`);
+        saveState(`Imported ${added} ${added === 1 ? 'reading' : 'readings'} into your local shelf.`);
         render();
       }
     }
@@ -436,8 +435,7 @@
       }
       const sample = getSyntheticSampleBook();
       state.books.unshift(sample);
-      saveState();
-      setStatus('Loaded synthetic sample reading. Open it or import your own files.');
+      saveState('Loaded synthetic sample reading. Open it or import your own files.');
       render();
     };
     $('loadSampleBtn').addEventListener('click', loadSample);
@@ -460,10 +458,8 @@
       const parsed = parseDocumentToChapters(body, `${title || 'Local Note'}.md`);
       const record = createBookRecord({ title: title || parsed.title, chapters: parsed.chapters, sourceName: 'Pasted text' });
       state.books.unshift(record);
-      saveState();
       $('pasteModal').hidden = true;
-      setStatus(`Saved "${record.title}" to your shelf.`);
-      openBook(record.id);
+      openBook(record.id, `Saved "${record.title}" to your shelf.`);
     });
 
     $('exportShelfBtn').addEventListener('click', exportShelf);
@@ -482,8 +478,7 @@
         const existingIds = new Set(state.books.map((b) => b.id));
         const merged = [...result.books.filter((b) => !existingIds.has(b.id)), ...state.books];
         state.books = merged;
-        saveState();
-        setStatus(`Restored ${result.books.length} readings from backup.`);
+        saveState(`Restored ${result.books.length} readings from backup.`);
         render();
       } catch {
         setStatus('Could not parse backup JSON file.');
