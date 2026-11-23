@@ -213,11 +213,12 @@ export async function analyzeEventsMetadataOnly(rawEvents) {
       if (!path) continue;
       const key = `${ev.pubkey}::root`;
       if (!legacyBuckets.has(key)) {
-        legacyBuckets.set(key, { pubkey: ev.pubkey, namespace: 'root (kind 34128)', files: new Map(), latestAt: 0, eventIds: [] });
+        legacyBuckets.set(key, { pubkey: ev.pubkey, namespace: 'root (kind 34128)', files: new Map(), latestAt: 0, eventIds: [], idMatches: true });
       }
       const bucket = legacyBuckets.get(key);
       bucket.latestAt = Math.max(bucket.latestAt, ev.created_at);
       bucket.eventIds.push(ev.id || computedId);
+      bucket.idMatches &&= idMatches;
       const existing = bucket.files.get(path);
       if (!existing || ev.created_at > existing.createdAt || (ev.created_at === existing.createdAt && (ev.id || computedId) < existing.eventId)) {
         bucket.files.set(path, {
@@ -316,9 +317,9 @@ export async function analyzeEventsMetadataOnly(rawEvents) {
       manifestFingerprint,
       latestEventId: bucket.eventIds[0],
       latestCreatedAt: bucket.latestAt,
-      idMatches: true,
+      idMatches: bucket.idMatches,
       versionCount: 1,
-      versions: [{ eventId: bucket.eventIds[0], createdAt: bucket.latestAt, idMatches: true }],
+      versions: [{ eventId: bucket.eventIds[0], createdAt: bucket.latestAt, idMatches: bucket.idMatches }],
     });
   }
 
