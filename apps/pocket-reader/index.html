@@ -607,6 +607,8 @@
     loadSkin();
     loadState();
     render();
+    const restoredBook = getActiveBook();
+    if (restoredBook) window.scrollTo({ top: restoredBook.scrollTop || 0, behavior: 'auto' });
   </script>
 </body>
 </html>
