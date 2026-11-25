@@ -1,0 +1,22 @@
+{
+  "name": "@pretend-internet/nostr-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=22.12" },
+  "dependencies": {
+    "dompurify": "3.5.0",
+    "fflate": "0.8.3",
+    "marked": "18.3.0",
+    "nostr-tools": "2.25.2"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
+  }
+}
