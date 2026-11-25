@@ -68,6 +68,7 @@ export async function render(main) {
     const chapter = book.chapters[current];
     const url = new URL(location.href);
     url.searchParams.set('chapter', String(current + 1));
+    url.searchParams.delete('start');
     history.replaceState(null, '', url);
     title.textContent = chapter.title.replace(/^Chapter\s+[^:]+:\s*/i, '');
     progress.textContent = `${current + 1} of ${book.chapters.length}`;
@@ -128,5 +129,5 @@ export async function render(main) {
   addEventListener('pagehide', persist);
   applySettings();
   ready = true;
-  draw(restore?.chapter === current ? restore.y || 0 : 0);
+  draw(!query.has('start') && restore?.chapter === current ? restore.y || 0 : 0);
 }

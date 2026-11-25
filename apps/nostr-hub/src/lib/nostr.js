@@ -38,8 +38,16 @@ export async function fetchEvents(filter, relays, limit = 24, client = transport
   if (events.length) await putMany('events', events);
   return { events, relays: results.map(({ url, events, status }) => ({ url, count: events.length, status })) };
 }
+export async function profileDirectory() {
+  const profiles = new Map();
+  for (const event of await cached([kinds.profile])) {
+    if (!profiles.has(event.pubkey)) profiles.set(event.pubkey, profileFromEvent(event));
+  }
+  return profiles;
+}
 export async function preferences(author) {
-  const [list, blossom, profile] = await Promise.all([kinds.relayList, kinds.blossom, kinds.profile].map(async kind => (await cached([kind], author))[0]));
+  const events = await cached([kinds.relayList, kinds.blossom, kinds.profile], author);
+  const [list, blossom, profile] = [kinds.relayList, kinds.blossom, kinds.profile].map(kind => events.find(event => event.kind === kind));
   const relayTags = list?.tags.filter(parts => parts[0] === 'r') ?? [];
   return {
     read: endpoints(relayTags.filter(parts => !parts[2] || parts[2] === 'read').map(parts => parts[1])),

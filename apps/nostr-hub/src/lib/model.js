@@ -61,6 +61,7 @@ export const matchesWords = (query, ...haystack) => {
   return query.toLowerCase().trim().split(/\s+/).every(word => text.includes(word));
 };
 export function safePath(path) {
+  if (typeof path !== 'string' || path.length > 4095 || /[?#]|%2e|%2f|%5c/i.test(path)) throw new Error('A file has an invalid path.');
   const parts = path.replace(/^\/+/, '').split('/');
   if (parts.some(part => !part || part === '.' || part === '..' || /[\\\u0000-\u001f]/.test(part))) throw new Error('A file has an invalid path.');
   return parts.join('/');

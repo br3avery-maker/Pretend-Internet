@@ -3,12 +3,27 @@ import { setting, setSetting } from './lib/store.js';
 import { preferences, shortKey } from './lib/nostr.js';
 
 const current = document.body.dataset.page;
-const groups = { project: 'discover', book: 'library', reader: 'library', curate: 'library' };
-const module = { discover: 'discover', project: 'discover', arcade: 'discover', library: 'library', book: 'library', reader: 'reader', curate: 'library', music: 'music', profile: 'account', network: 'account', publish: 'publish', index: 'home', help: 'home' };
+const groups = { project: 'discover', book: 'library', reader: 'library', curate: 'library', writing: 'library' };
+const pages = {
+  index: () => import('./pages/home.js'),
+  help: () => import('./pages/home.js'),
+  discover: () => import('./pages/discover.js'),
+  project: () => import('./pages/discover.js'),
+  arcade: () => import('./pages/discover.js'),
+  library: () => import('./pages/library.js'),
+  writing: () => import('./pages/library.js'),
+  book: () => import('./pages/library.js'),
+  curate: () => import('./pages/library.js'),
+  reader: () => import('./pages/reader.js'),
+  music: () => import('./pages/music.js'),
+  profile: () => import('./pages/account.js'),
+  network: () => import('./pages/account.js'),
+  publish: () => import('./pages/publish.js'),
+};
 const destinations = [
   ['index', 'Home', 'home'], ['discover', 'Discover', 'discover'], ['library', 'Library', 'book'],
   ['music', 'Music', 'music'], ['arcade', 'Arcade', 'game'], ['publish', 'Publish', 'bolt'],
-  ['profile', 'Profiles', 'user'], ['network', 'Network', 'network'], ['help', 'Help', 'help'],
+  ['writing', 'Writing', 'book'], ['profile', 'Profiles', 'user'], ['network', 'Network', 'network'], ['help', 'Help', 'help'],
 ];
 
 async function shell() {
@@ -47,7 +62,7 @@ if (current !== 'reader') {
   try { await shell(); } catch { main.prepend('Local account settings are unavailable.'); }
 }
 try {
-  const loaded = await import('./pages/' + module[current] + '.js');
+  const loaded = await pages[current]();
   await loaded.render(main, current);
 } catch (error) {
   main.replaceChildren(el('p', { role: 'alert' }, 'Could not open this page. ' + error.message), link('Home', route('index')));

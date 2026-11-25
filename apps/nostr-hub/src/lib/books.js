@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { all, get, put, setting } from './store.js';
 import { cached } from './nostr.js';
+import { chaptersFromMarkdown } from './text.js';
 import { kinds, newestByAddress, tag, tags } from './model.js';
 
 let bundled;
@@ -28,18 +29,6 @@ export async function books() {
   return [...documents.values()].map(work => ({ ...work, ...edits[work.id] }));
 }
 export const findBook = async id => (await books()).find(work => work.id === id);
-export function chaptersFromMarkdown(text) {
-  const sections = [];
-  let part = { id: '1', title: 'Start', text: '' };
-  for (const token of marked.lexer(text)) {
-    if (token.type === 'heading' && token.depth <= 2) {
-      if (part.text.trim()) sections.push(part);
-      part = { id: String(sections.length + 1), title: token.text, text: '' };
-    } else part.text += token.raw ?? '';
-  }
-  if (part.text.trim() || !sections.length) sections.push(part);
-  return sections;
-}
 export async function importBook(file) {
   if (!/\.(md|markdown|txt)$/i.test(file.name)) throw new Error('Choose a Markdown or plain text document.');
   if (file.size > 4 * 1024 * 1024) throw new Error('Choose a text file under 4 MiB.');

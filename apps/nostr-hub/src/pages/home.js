@@ -5,6 +5,7 @@ const sections = [
   ['arcade', 'Arcade', 'game', 'Open games from their published homes'],
   ['library', 'Bookshelf', 'book', 'Read stories, articles, and your own books'],
   ['music', 'Music', 'music', 'Play tracks and browse releases'],
+  ['writing', 'Writing', 'book', 'Find and read published articles'],
   ['publish', 'Publish', 'bolt', 'Review and sign a public release'],
   ['profile', 'Profiles', 'user', 'Browse a public Nostr account'],
 ];

@@ -1,6 +1,6 @@
 import { button, el, heading, icon, label, link, modal, muted, query, route, run, setStatus, status } from '../lib/dom.js';
-import { groupSites, kinds, matchesWords, siteURL } from '../lib/model.js';
-import { cached, npub, preferences, reloadCatalog, shortKey } from '../lib/nostr.js';
+import { groupSites, kinds, matchesWords, siteURL, tag } from '../lib/model.js';
+import { cached, npub, preferences, profileDirectory, reloadCatalog, shortKey } from '../lib/nostr.js';
 import { saveCollections, setting, toggleList } from '../lib/store.js';
 
 const siteKinds = [kinds.root, kinds.site];
@@ -8,11 +8,12 @@ const siteLink = site => siteURL(site.event.pubkey, site.slug, npub(site.event.p
 const localPath = site => route('project', { site: site.address });
 const suggested = new Map([['mojisurvivor', 'MojiSurvivor'], ['2048-link', '2048 Link'], ['melody-2048', 'Melody’s 2048']]);
 const isGame = site => site.category === 'Game' || suggested.get(site.slug)?.replace('’', "'") === site.title.replace('’', "'");
-function siteRow(site, author, arcade) {
+function siteRow(site, author, arcade, best) {
   return el('article', { class: 'entry stack-tight' },
     el('div', { class: 'split' }, el('h3', {}, link(site.title, localPath(site))),
       arcade && siteLink(site) && el('a', { class: 'button primary', href: siteLink(site), target: '_blank', rel: 'noopener noreferrer' }, 'Play')),
     muted([author, site.files ? `${site.files} declared files` : '', site.versions.length > 1 ? `${site.versions.length} observed versions` : ''].filter(Boolean).join(' · ')),
+    site.slug === 'mojisurvivor' && best && el('p', {}, 'Published high score: ' + best),
     site.description && el('p', {}, site.description.slice(0, 330)));
 }
 async function catalog(main, arcade) {
@@ -26,25 +27,30 @@ async function catalog(main, arcade) {
   const showHidden = el('input', { type: 'checkbox' });
   let sites = [];
   let profiles = new Map();
+  let best;
   function draw() {
     const hidden = setting('hidden-publishers', []);
     const favorites = setting('saved-sites', []);
     const filtered = sites.filter(site => (!arcade || isGame(site))
       && (showHidden.checked ? hidden.includes(site.event.pubkey) : !hidden.includes(site.event.pubkey))
       && (!saved.checked || favorites.includes(site.address))
-      && matchesWords(filter.value, site.title, site.description, site.topics, profiles.get(site.event.pubkey), site.slug));
-    results.replaceChildren(...filtered.map(site => siteRow(site, profiles.get(site.event.pubkey) || shortKey(site.event.pubkey), arcade)));
+      && matchesWords(filter.value, site.title, site.description, site.topics, profiles.get(site.event.pubkey)?.name, site.slug));
+    results.replaceChildren(...filtered.map(site => siteRow(site, profiles.get(site.event.pubkey)?.name || shortKey(site.event.pubkey), arcade, best)));
     if (!filtered.length) results.append(muted(sites.length ? 'No matches for these filters.' : 'Refresh to look up public publications. Previously discovered results are available offline.'));
   }
   async function load() {
     sites = groupSites(await cached(siteKinds, author));
-    const publishers = [...new Set(sites.map(site => site.event.pubkey))];
-    profiles = new Map(await Promise.all(publishers.map(async key => [key, (await preferences(key)).profile.name])));
+    profiles = await profileDirectory();
+    if (arcade && author) {
+      const save = (await cached([kinds.appData], author)).find(event => tag(event, 'd') === 'mojisurvivor:progress:v1');
+      const score = save && Number(tag(save, 'high_score'));
+      best = Number.isSafeInteger(score) && score > 0 ? score.toLocaleString() : '';
+    }
     draw();
   }
   refresh.addEventListener('click', run(refresh, notice, async () => {
     setStatus(notice, 'Reading signed publication metadata.');
-    const result = await reloadCatalog(siteKinds, author);
+    const result = await reloadCatalog(arcade && author ? [...siteKinds, kinds.appData] : siteKinds, author);
     await load();
     setStatus(notice, result.reached ? `${result.count} signed events returned by ${result.reached} relays.` : 'No relays completed the query. Showing cached results.');
   }));

@@ -50,7 +50,7 @@ export const heading = (title, ...actions) => el('header', { class: 'split' }, e
 export function modal(title, className, ...content) {
   const node = el('dialog', { class: className, 'aria-label': title },
     el('div', { class: 'stack' }, el('div', { class: 'split' }, el('h2', {}, title), iconButton('close', 'Close', () => node.close())), content));
-  node.addEventListener('click', event => { if (event.target === node) node.close(); });
+  node.addEventListener('click', event => { if (event.target === node && !node.dataset.busy) node.close(); });
   document.body.append(node);
   return node;
 }

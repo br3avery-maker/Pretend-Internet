@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "build": "vite build && node scripts/offline.js",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test test/*.test.js"
   },
-  "engines": { "node": ">=22.12" },
+  "engines": {
+    "node": ">=22.12"
+  },
   "dependencies": {
     "dompurify": "3.5.0",
     "fflate": "0.8.3",
@@ -17,6 +19,7 @@
     "nostr-tools": "2.25.2"
   },
   "devDependencies": {
+    "playwright": "1.65.1",
     "vite": "8.3.8"
   }
 }

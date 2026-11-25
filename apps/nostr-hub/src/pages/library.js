@@ -11,11 +11,11 @@ const cover = book => book.cover
   ? el('img', { src: book.cover, alt: '', loading: 'lazy' })
   : el('span', { class: 'book-cover-placeholder' }, icon('book'));
 
-async function bookshelf(main) {
+async function bookshelf(main, writing) {
   const search = el('input', { type: 'search', placeholder: 'Search title, author, series, or tag', 'aria-label': 'Search the bookshelf' });
   const filter = el('select', { 'aria-label': 'Bookshelf category' },
     el('option', { value: 'all' }, 'All works'), el('option', { value: 'books' }, 'Books'), el('option', { value: 'articles' }, 'Writing'), el('option', { value: 'bookmarks' }, 'Bookmarks'));
-  if (query.get('view') === 'articles') filter.value = 'articles';
+  if (writing || query.get('view') === 'articles') filter.value = 'articles';
   const shelf = el('div', { class: 'shelf' });
   const message = status();
   const resume = el('div', { class: 'row' });
@@ -44,7 +44,9 @@ async function bookshelf(main) {
   }));
   search.addEventListener('input', draw);
   filter.addEventListener('change', draw);
-  main.replaceChildren(heading('Bookshelf', link('Curate', route('curate'), 'button')), resume,
+  main.replaceChildren(heading(writing ? 'Writing' : 'Bookshelf', link('Curate', route('curate'), 'button')),
+    el('nav', { class: 'tabs', 'aria-label': 'Library pages' }, ...[['library','Bookshelf'],['writing','Writing']].map(([page,title]) =>
+      el('a', { class: 'button', href: route(page), 'aria-current': (page === 'writing') === writing ? 'page' : null }, title))), resume,
     el('div', { class: 'row' }, search, filter), refresh, message, shelf);
   await load();
 }
@@ -61,7 +63,7 @@ async function details(main) {
         preview, el('div', { class: 'row' }, link(setting('positions', {})[book.id] ? 'Continue reading' : 'Read', readBook(book.id), 'button primary'),
           link('Curate', route('curate', { book: book.id }), 'button')))),
     el('h2', {}, 'Chapters'), el('ol', { class: 'stack-tight' }, book.chapters.map((chapter, i) =>
-      el('li', {}, link(chapter.title, route('reader', { book: book.id, chapter: i + 1 })), marks.includes(chapter.id) && ' · Saved'))));
+      el('li', {}, link(chapter.title, route('reader', { book: book.id, chapter: i + 1, start: 1 })), marks.includes(chapter.id) && ' · Saved'))));
 }
 async function curate(main) {
   const works = await books();
@@ -129,5 +131,5 @@ async function curate(main) {
 export function render(main, page) {
   if (page === 'book') return details(main);
   if (page === 'curate') return curate(main);
-  return bookshelf(main);
+  return bookshelf(main, page === 'writing');
 }
