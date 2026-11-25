@@ -1,5 +1,6 @@
 import { button, el, heading, label, link, modal, muted, route, run, setStatus, status } from '../lib/dom.js';
-import { bootstrap, endpoints, npub, parseKey, preferences, refreshIdentity, shortKey } from '../lib/nostr.js';
+import { bootstrap, endpoints, npub, parseKey, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
+import { kinds } from '../lib/model.js';
 import { saveAccount, setting, setSetting } from '../lib/store.js';
 
 function list(values, empty) {
@@ -13,7 +14,7 @@ async function network(main) {
   const blossom = el('textarea', { rows: 3, placeholder: 'https://blossom.example', spellcheck: 'false' }, setting('blossom', []).join('\n'));
   const message = status();
   const save = el('button', { class: 'primary' }, 'Save overrides');
-  form.append(label('Additional relays', relays), label('Preferred Blossom servers', blossom), save, message);
+  form.append(label('Additional relays', relays), label('Preferred Blossom servers', blossom), save);
   form.addEventListener('submit', run(save, message, async () => {
     const candidates = [relays, blossom].map(input => input.value.trim().split(/\s+/).filter(Boolean));
     const normalized = [endpoints(candidates[0]), endpoints(candidates[1], true)];
@@ -32,11 +33,25 @@ async function network(main) {
     } catch (error) { setStatus(message, error.message); }
     finally { refresh.disabled = false; }
   });
-  main.replaceChildren(heading('Network', author && refresh),
+  const diagnostics = el('ul', { class: 'stack-tight', 'aria-label': 'Relay check results' });
+  const check = el('button', { type: 'button' }, 'Check connections');
+  check.addEventListener('click', run(check, message, async () => {
+    const urls = endpoints([...setting('relays', []), ...profile.write, ...bootstrap]).slice(0, 6);
+    setStatus(message, 'Checking relay responses.');
+    const results = await Promise.all(urls.map(async url => {
+      try {
+        const sampled = await transport.query(url, { kinds: [kinds.relayList], ...(author && { authors: [author] }) }, 1);
+        return [url, ['complete', 'limited'].includes(sampled.status) ? 'Responded' : sampled.status];
+      } catch (error) { return [url, error.code || 'Unavailable']; }
+    }));
+    diagnostics.replaceChildren(...results.map(([url, result]) => el('li', {}, el('code', {}, url), ' · ', result)));
+    setStatus(message, 'Relay check complete.');
+  }));
+  main.replaceChildren(heading('Network', check, author && refresh),
     el('section', { class: 'stack-tight' }, el('h2', {}, 'Read relays'), list(profile.read, 'Using the app’s discovery relays.')),
     el('section', { class: 'stack-tight' }, el('h2', {}, 'Write relays'), list(profile.write, 'Choose public destinations on the Publish screen.')),
     el('section', { class: 'stack-tight' }, el('h2', {}, 'Blossom servers'), list(profile.blossom, 'The active account has no saved server list.')),
-    el('details', {}, el('summary', {}, 'Discovery relays'), list(bootstrap, '')), el('h2', {}, 'Overrides'), form);
+    el('details', {}, el('summary', {}, 'Discovery relays'), list(bootstrap, '')), diagnostics, message, el('h2', {}, 'Overrides'), form);
 }
 async function profiles(main) {
   const active = setting('account', '');
@@ -66,8 +81,8 @@ async function profiles(main) {
       el('div', { class: 'stack-tight' }, el('h3', {}, profile.name || shortKey(key)), muted(active === key ? 'Active browsing profile' : shortKey(key))),
       el('div', { class: 'row' }, more, active !== key && button('Use profile', () => { saveAccount(key); location.reload(); })));
   }));
-  main.replaceChildren(heading('Profiles'), current?.profile.banner && el('img', { class: 'profile-banner', src: current.profile.banner, alt: '', referrerpolicy: 'no-referrer' }),
-    entries, active && button('Browse without a profile', () => { setSetting('account', ''); location.reload(); }),
+  main.replaceChildren(heading('Profiles'), ...(current?.profile.banner ? [el('img', { class: 'profile-banner', src: current.profile.banner, alt: '', referrerpolicy: 'no-referrer' })] : []),
+    ...entries, active && button('Browse without a profile', () => { setSetting('account', ''); location.reload(); }),
     form, link('Connect a signer in Publish', route('publish'), 'button'));
 }
 export function render(main, page) { return page === 'network' ? network(main) : profiles(main); }

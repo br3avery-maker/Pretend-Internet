@@ -21,7 +21,7 @@ function receiptPanel(job) {
   const detail = el('details', { class: 'entry' }, el('summary', {}, `${job.title || typeNames[job.type]} · ${results[job.status] || job.status}`),
     job.event && el('p', {}, el('code', {}, job.event.id)),
     el('p', {}, `${Object.keys(job.uploads).length} verified Blossom files`),
-    job.attempts.length && el('ul', { class: 'stack-tight' }, job.attempts.map(row =>
+    job.attempts.length > 0 && el('ul', { class: 'stack-tight' }, job.attempts.map(row =>
       el('li', {}, el('code', {}, row.url), ' · ', row.verified ? 'Verified' : row.accepted ? 'Accepted' : row.code))),
     el('div', { class: 'row' }, copy, job.url && job.attempts.some(row => row.verified) &&
       el('a', { class: 'button', href: job.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open publication')));
@@ -32,7 +32,9 @@ export async function render(main) {
   const drafts = setting('drafts', {});
   const notice = status();
   const signerLine = muted('No signer connected');
-  const pairingStatus = status();
+  const interrupted = sessionStorage.getItem('pretend-internet:pairing') === 'waiting';
+  sessionStorage.removeItem('pretend-internet:pairing');
+  const pairingStatus = status(interrupted ? 'The previous pairing was interrupted. Start a new connection.' : '');
   const transportRelay = el('input', { value: 'wss://relay.nsecbunker.com', 'aria-label': 'Signer transport relay', spellcheck: 'false' });
   const uriBox = el('textarea', { readOnly: true, hidden: true, 'aria-label': 'Copyable connection link', rows: 3 });
   const bunkerInput = el('input', { type: 'password', placeholder: 'bunker://…', autocomplete: 'off', spellcheck: 'false' });
@@ -41,6 +43,7 @@ export async function render(main) {
   const connect = el('button', { type: 'button' }, 'Copy connection');
   connect.addEventListener('click', run(connect, pairingStatus, async () => {
     attempt = pairing(transportRelay.value.trim());
+    sessionStorage.setItem('pretend-internet:pairing', 'waiting');
     uriBox.value = attempt.uri;
     uriBox.hidden = false;
     cancelPair.hidden = false;
@@ -58,6 +61,7 @@ export async function render(main) {
       await useSigner(await pending);
     } finally {
       attempt = null;
+      sessionStorage.removeItem('pretend-internet:pairing');
       uriBox.value = '';
       uriBox.hidden = true;
       cancelPair.hidden = true;
@@ -131,7 +135,7 @@ export async function render(main) {
     const picked = drafts[type.value]?.relays;
     const list = endpoints([...setting('relays', []), ...write, bootstrap[0]]).slice(0, 12);
     const defaults = list.slice(0, 2);
-    destinations.replaceChildren(el('h3', {}, 'Relay destinations'), ...list.map((url, index) =>
+    destinations.replaceChildren(el('h3', {}, 'Relay destinations'), ...list.map(url =>
       el('label', { class: 'check' }, el('input', { type: 'checkbox', value: url, checked: picked ? picked.includes(url) : defaults.includes(url) }), el('code', {}, url))));
     const servers = endpoints([...setting('blossom', []), ...blossom, defaultBlossom], true).slice(0, 12);
     server.replaceChildren(...servers.map(url => el('option', { value: url }, url)));
@@ -219,7 +223,7 @@ export async function render(main) {
       el('p', {}, `${typeNames[selection.type]} · ${selection.title || 'New note'}`),
       muted('Account ' + shortKey(selectedSigner.pubkey)),
       selection.body && el('div', { class: 'inline-preview' }, selection.body),
-      selection.server && el('p', {}, `${snapshot.length} files will be uploaded to `, el('code', {}, selection.server)),
+      selection.server && el('p', {}, `${snapshot.length} ${snapshot.length === 1 ? 'file' : 'files'} will be uploaded to `, el('code', {}, selection.server)),
       selection.type === 'nsite' && el('details', {}, el('summary', {}, 'Files to upload'),
         el('ul', {}, snapshot.map(file => el('li', {}, file.path, ' · ', el('code', {}, file.hash))))),
       el('ul', {}, selection.relays.map(url => el('li', {}, el('code', {}, url)))), send, progress);

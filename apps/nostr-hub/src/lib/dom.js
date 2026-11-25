@@ -46,10 +46,10 @@ export const label = (title, control) => el('label', {}, title, control);
 export const muted = text => el('p', { class: 'muted' }, text);
 export const status = text => el('p', { role: 'status', class: 'notice', hidden: !text }, text || '');
 export function setStatus(node, text) { node.textContent = text; node.hidden = !text; }
-export const heading = (title, ...actions) => el('header', { class: 'split' }, el('h1', {}, title), actions.length && el('div', { class: 'row' }, actions));
+export const heading = (title, ...actions) => el('header', { class: 'split' }, el('h1', {}, title), actions.length > 0 && el('div', { class: 'row' }, actions));
 export function modal(title, className, ...content) {
   const node = el('dialog', { class: className, 'aria-label': title },
-    el('div', { class: 'stack' }, el('div', { class: 'split' }, el('h2', {}, title), iconButton('close', 'Close', () => node.close())), content));
+    el('div', { class: 'stack' }, el('div', { class: 'dialog-heading' }, el('h2', {}, title), iconButton('close', 'Close', () => node.close())), content));
   node.addEventListener('click', event => { if (event.target === node && !node.dataset.busy) node.close(); });
   document.body.append(node);
   return node;

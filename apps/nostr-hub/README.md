@@ -46,3 +46,13 @@ The browser suite serves the built app over loopback and exercises simulated pub
 - The Loopy Library v3 source release by Puter provides the story text and both covers. The published, signature-verified manifest was checked against all 71 release files. This app carries the two covers unchanged and converts the published browser catalog into readable JSON with local asset paths. [Public release source](https://github.com/br3avery-maker/Puters_SwarmMemo/tree/main/storybook/loopy-library-v3)
 - Relay request validation and transport come from [Pretend Internet’s relay router](../../tools/relay-router/). The browser build brings in its dependencies through the app’s pinned package versions.
 - Third-party dependencies and licensing are retained in the package lock and the production bundle’s dependency licenses where applicable. No private chat excerpts or credential data are packaged.
+
+## Verified behavior
+
+| Check | Result |
+| --- | --- |
+| Production build and app metadata | Fourteen routable HTML documents with shared modules, service worker, both books, and both cover assets. Existing root frontend verification also passed. |
+| Mobile Chromium | Signed profile loading and switching, connection diagnostics, metadata-only discovery, publisher hiding, arcade handoff, actual audio playback through a test media endpoint, writing, cover loading, swipe/bookmarks, offline reading-position restore, and Markdown import and curation. |
+| Publishing | A disposable signer authorized a file upload, the app checked bytes after retrieval, then signed a manifest and verified it through a separate relay query. Review produced no upload or relay write. Unit tests also check retry and readback failure. |
+| Public source checks | Ditto returned signature-verified user and Puter events. Two declared track URLs responded as MPEG audio. The published 2048 Link game HTML ran a scoring move in an isolated browser with external requests blocked, and its score survived reload. |
+| Remaining device evidence | Android installation, Amber handoff on a phone, and real public publish delivery have yet to be exercised for this build. |

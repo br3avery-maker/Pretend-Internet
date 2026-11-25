@@ -1,4 +1,4 @@
-import { button, el, iconButton, label, link, modal, muted, query, route } from '../lib/dom.js';
+import { el, iconButton, label, link, modal, muted, query, route } from '../lib/dom.js';
 import { findBook, renderChapter } from '../lib/books.js';
 import { setting, setSetting } from '../lib/store.js';
 
@@ -35,7 +35,7 @@ export async function render(main) {
     setSetting('reader-display', { size: Number(size.value), spacing: Number(spacing.value), font: font.value, light: light.checked });
   }
   for (const control of [size, spacing, font, light]) control.addEventListener('input', applySettings);
-  const mark = button('Bookmark', () => {
+  const mark = iconButton('save', 'Bookmark', () => {
     const all = setting('bookmarks', {});
     const id = book.chapters[current].id;
     const saved = new Set(all[book.id] ?? []);
@@ -56,12 +56,14 @@ export async function render(main) {
 
   function paintMark() {
     const saved = (setting('bookmarks', {})[book.id] ?? []).includes(book.chapters[current].id);
-    mark.textContent = saved ? 'Saved' : 'Bookmark';
+    const label = saved ? 'Saved' : 'Bookmark';
+    mark.setAttribute('aria-label', label);
+    mark.title = label;
     mark.setAttribute('aria-pressed', String(saved));
   }
   function persist() {
     if (!ready) return;
-    setSetting('positions', { ...setting('positions', {}), [book.id]: { chapter: current, y: window.scrollY, width: innerWidth } });
+    setSetting('positions', { ...setting('positions', {}), [book.id]: { chapter: current, y: window.scrollY } });
     setSetting('last-book', book.id);
   }
   function draw(y) {

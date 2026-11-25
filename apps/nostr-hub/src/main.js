@@ -1,5 +1,5 @@
 import { button, el, icon, iconButton, link, modal, route } from './lib/dom.js';
-import { setting, setSetting } from './lib/store.js';
+import { setting } from './lib/store.js';
 import { preferences, shortKey } from './lib/nostr.js';
 
 const current = document.body.dataset.page;
@@ -32,11 +32,8 @@ async function shell() {
   const nav = (page, title, symbol) => el('a', {
     href: route(page), class: 'nav-link', 'aria-current': (groups[current] ?? current) === page ? 'page' : null,
   }, icon(symbol), title);
-  const skin = el('input', { type: 'checkbox', checked: setting('reduce-chrome', false) });
-  skin.addEventListener('change', () => { setSetting('reduce-chrome', skin.checked); document.body.classList.toggle('compact', skin.checked); });
   const settings = modal('Settings', 'sheet', el('nav', { class: 'menu' },
-    link('Profiles and signer', route('profile')), link('Network and storage', route('network')), link('Help and data', route('help'))),
-    el('label', { class: 'check' }, skin, 'Compact headings'));
+    link('Profiles and signer', route('profile')), link('Network and storage', route('network')), link('Help and data', route('help'))));
   const menu = modal(accountData.name || shortKey(account), 'drawer',
     el('nav', { class: 'menu', 'aria-label': 'App pages' },
       destinations.map(([page, title, symbol]) => el('a', { href: route(page) }, icon(symbol), title)),
@@ -44,7 +41,6 @@ async function shell() {
   const avatar = el('button', { class: 'avatar', 'aria-label': 'Open profile menu', onclick: () => menu.showModal() },
     accountData.picture ? el('img', { src: accountData.picture, alt: '', referrerpolicy: 'no-referrer' }) : icon('user'));
   avatar.querySelector('img')?.addEventListener('error', () => avatar.replaceChildren(icon('user')));
-  document.body.classList.toggle('compact', skin.checked);
   document.querySelector('#shell').append(
     el('header', { class: 'topbar' }, el('div', { class: 'topbar-inner' }, avatar,
       link('Pretend Internet', route('index'), 'title'), el('span', { class: 'spacer' }),

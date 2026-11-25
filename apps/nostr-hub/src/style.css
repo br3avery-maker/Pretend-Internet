@@ -117,5 +117,9 @@ pre { overflow: auto; max-width: 100%; white-space: pre-wrap; overflow-wrap: any
   .reader-controls .button, .reader-controls button { padding-inline: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
-.compact h1 { font-size: clamp(1.8rem, 6vw, 2.4rem); letter-spacing: -.035em; }
 .profile-banner { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; }
+.dialog-heading { display: grid; align-items: start; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.reader-chrome .title { line-height: 1.2; overflow-wrap: anywhere; }
+.reader-controls .split, .reader-controls .row { flex-wrap: nowrap; gap: 5px; }
+.reader-controls button, .reader-controls .button { min-height: 44px; min-width: 42px; padding-inline: 8px; }
+.reader-controls button[aria-pressed="true"] { color: var(--pale); border-color: var(--pink); background: var(--pink-deep); }

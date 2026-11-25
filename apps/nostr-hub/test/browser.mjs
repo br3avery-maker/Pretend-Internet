@@ -119,6 +119,9 @@ async function snap(name) {
 try {
   await open('index.html');
   await h1('Pretend Internet').waitFor();
+  await page.setViewportSize({width:320,height:740});
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
+  await page.setViewportSize({width:393,height:852});
   assert.equal(await page.locator('main a.destination').count(),7);
   await snap('home');
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -136,6 +139,9 @@ try {
   await open('network.html');
   await h1('Network').waitFor();
   await page.getByText('https://blossom.fixture.example',{exact:true}).waitFor();
+  await button('Check connections').click();
+  await page.getByText('Relay check complete.').waitFor();
+  assert.ok(await page.getByRole('list',{name:'Relay check results'}).getByText('Responded',{exact:false}).count());
 
   await open('discover.html');
   await button('Refresh').click();
@@ -173,6 +179,10 @@ try {
   await page.getByText('This article came from a signed event.').waitFor();
 
   await open('library.html');
+  await page.waitForFunction(() => {
+    const covers = [...document.querySelectorAll('.shelf img')];
+    return covers.length === 2 && covers.every(image => image.naturalWidth > 0);
+  });
   await snap('bookshelf');
   await link('The Loopy Library',false).first().click();
   await link('Read').click();
@@ -203,6 +213,7 @@ try {
   const path = page.getByLabel('Markdown or text file');
   await path.setInputFiles({name:'Test Book.md',mimeType:'text/markdown',buffer:Buffer.from('# One\n\nHello!\n\n# Two\n\nAgain.')});
   await button('Import document').click();
+  await page.waitForURL(/book=local%3A/);
   await page.getByLabel('Add to collection').fill('Fixture shelf');
   await button('Save changes').click();
   await page.getByRole('heading',{name:'Fixture shelf'}).waitFor();
@@ -233,6 +244,9 @@ try {
 
   assert.deepEqual(uncaught,[]);
   console.log('Mobile Chromium passed profiles, metadata-only discovery, game handoff, music playback, long-form writing, reader swipe and offline resume, Markdown curation, and disposable nsite signing and verification.');
+} catch (error) {
+  console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
+  throw error;
 } finally {
   await browser.close();
   server.close();
