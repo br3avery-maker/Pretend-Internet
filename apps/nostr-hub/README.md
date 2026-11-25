@@ -5,11 +5,21 @@ This Android-first web app brings independent sites, games, music and writing in
 ## Experience
 
 - Home and one profile menu link the app's pages. The account picker supports saved public profiles and a separate, explicit signer connection.
-- Discover reads bounded signed event metadata. It groups an addressable site by publisher and identifier, with search, saved items and publisher hiding. Opening a published site is an explicit navigation.
+- Discover accepts a publisher’s npub and opens selected sites at their published address. It reads bounded signed event metadata. It groups an addressable site by publisher and identifier, with search, saved items and publisher hiding. Opening a published site is an explicit navigation.
 - Arcade opens games at their published destinations. Music has a real audio player. The bookshelf opens long-form writing, bundled Loopy Library books and imported Markdown.
 - The reader has a chapter drawer, a full-screen reading mode, vertical scroll, horizontal chapter swipe, text settings and persistent bookmarks/position. Library curation supports collections and local metadata.
 - Publish stages a draft, presents the account and destinations for review, and distinguishes acceptance from independent relay readback. The application uses an external signer. Browsing and locally stored content do not require one.
 - Network uses the existing relay-router transport and separate Blossom preferences. Diagnostics live on their own screen.
+
+## Publishing nsites
+
+Connect the account you intend to use. The app remembers the Amber account on this device, restores approved remote sessions while the signer permits them, and checks the signing account and exact event before publishing. Direct Amber opens with the Android signer link and returns the result through the clipboard. Remote sessions retain an application delegation key wrapped by a non-extractable key in browser storage. The signer holds your Nostr private key. Disconnect clears the saved session on this device.
+
+**Create new nsite** accepts a static folder, ZIP, HTML file, Markdown, or text. It suggests a title and identifier and reads a description from HTML metadata. Markdown and text become a static page. Choose a named address or your account’s root address. The app blocks creation when it finds a publication at the same address on the checked relays.
+
+**Update existing nsite** starts from an owned signed manifest. A file or ZIP of changes adds or replaces those paths. Other paths stay in the manifest. Removal requires selecting the paths and confirming the changes. Review shows the full publishing npub, site address, current event ID, and file changes. The app checks the current manifest again before sending and verifies that its new signed event is the current version on selected relays.
+
+**Restore a saved version** republishes a signed baseline from this device at the original address. The files must still be retrievable by hash from Blossom. A publication receipt covers the verified Blossom files and relay version. Gateways can cache a previous version. The app does not control their cache or check every public relay.
 
 ## Source and publication
 
@@ -34,6 +44,7 @@ In Profiles, enter a public key to save that identity locally, then refresh Disc
 ## Verification
 
 ```sh
+npm ci --prefix tools/relay-router
 npm test --prefix apps/nostr-hub
 npx --prefix apps/nostr-hub playwright install chromium --only-shell
 node apps/nostr-hub/test/browser.mjs

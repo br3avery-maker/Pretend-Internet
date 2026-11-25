@@ -1,5 +1,8 @@
 import { unzipSync } from 'fflate';
-import { digest, kinds, safePath, siteURL, webURL } from './model.js';
+import { nip19 } from 'nostr-tools';
+import { checkSignature } from './nostr.js';
+import { assertHeads, planSite, siteHeads, siteServers, siteSlug, verifySavedFiles } from './site-publication.js';
+import { digest, kinds, safePath, siteURL, tag, tags, webURL } from './model.js';
 
 const maxBytes = 48 * 1024 * 1024;
 const maxFile = 24 * 1024 * 1024;
@@ -14,10 +17,10 @@ const mime = {
 };
 const typeFor = path => mime[path.split('.').at(-1)?.toLowerCase()] ?? 'application/octet-stream';
 export const now = () => Math.floor(Date.now() / 1000);
-export const slugValid = name => /^[a-z0-9](?:[a-z0-9-]{0,11}[a-z0-9])?$/.test(name);
+export const slugValid = siteSlug;
 const bounded = (size, limit) => { if (size > limit) throw new Error('The selected input exceeds the file-size limit.'); };
 
-export async function siteFiles(selected) {
+export async function siteFiles(selected, { partial = false } = {}) {
   if (!selected.length) throw new Error('Choose an HTML file, ZIP, or folder.');
   const first = selected[0];
   const loose = selected.length === 1 && !first.webkitRelativePath;
@@ -40,22 +43,23 @@ export async function siteFiles(selected) {
     } });
     files = Object.entries(contents).map(([path, bytes]) => ({ path, bytes }));
   } else {
-    if (loose && !/\.html?$/i.test(first.name)) throw new Error('Choose an HTML file, ZIP, or folder.');
+    if (loose && !partial && !/\.html?$/i.test(first.name)) throw new Error('Choose an HTML file, ZIP, or folder.');
     bounded(selected.reduce((sum,file) => sum + file.size, 0), maxBytes);
     if (selected.length > maxFiles) throw new Error('A site can contain up to 256 files.');
     files = await Promise.all(selected.map(async file => {
       bounded(file.size, maxFile);
-      return { path: loose ? 'index.html' : file.webkitRelativePath || file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+      return { path: loose && !partial ? 'index.html' : file.webkitRelativePath || file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
     }));
   }
   const input = files.map(file => ({ ...file, path: safePath(file.path) }));
   if (!input.some(file => file.path === 'index.html')) {
     const root = input[0]?.path.split('/')[0];
-    if (root && input.every(file => file.path.startsWith(root + '/'))) {
+    if (root && input.every(file => file.path.startsWith(root + '/'))
+        && (first.webkitRelativePath || input.some(file => file.path === root + '/index.html'))) {
       for (const file of input) file.path = file.path.slice(root.length + 1);
     }
   }
-  if (!input.some(file => file.path === 'index.html' && file.bytes.length)) throw new Error('The folder or ZIP needs a nonempty index.html entry.');
+  if ((!partial || input.some(file => file.path === 'index.html')) && !input.some(file => file.path === 'index.html' && file.bytes.length)) throw new Error('The folder or ZIP needs a nonempty index.html entry.');
   bounded(input.reduce((sum,file) => sum + file.bytes.length, 0), maxBytes);
   const paths = new Set();
   return Promise.all(input.map(async file => {
@@ -76,8 +80,9 @@ export async function aggregate(files) {
   return digest(enc.encode(files.map(file => `${file.hash} ${file.path}\n`).sort().join('')));
 }
 export function uploadAuth(file, server, clock = now()) {
-  return { kind: 24242, created_at: clock, content: 'Upload ' + file.hash,
-    tags: [['t', 'upload'], ['x', file.hash], ['expiration', String(clock + 300)], ['server', new URL(server).host]] };
+  const hashes = [...new Set([file].flat().map(item => item.hash))];
+  return { kind: 24242, created_at: clock, content: 'Approve upload of ' + hashes.length + ' reviewed file(s)',
+    tags: [['t', 'upload'], ...hashes.map(hash => ['x', hash]), ['expiration', String(clock + 300)], ['server', new URL(server).host]] };
 }
 export async function uploadVerified(file, server, sign, fetcher = fetch) {
   const auth = await sign(uploadAuth(file, server));
@@ -110,12 +115,17 @@ export async function uploadVerified(file, server, sign, fetcher = fetch) {
   if (offset !== file.bytes.length || await digest(bytes) !== file.hash) throw new Error('The retrieved Blossom file differs from the selected file.');
   return url;
 }
-export async function template(draft, files, urls, clock = now()) {
+export async function template(draft, files, urls, clock = now(), plan) {
   if (draft.type === 'nsite') {
+    const source = plan?.source;
+    const paths = plan ? [...plan.paths.values()] : files;
+    const preserved = source?.tags.filter(parts => !['d', 'path', 'title', 'description', 'server'].includes(parts[0])
+      && !(parts[0] === 'x' && (parts[2] === 'aggregate' || parts.length === 2))) ?? [];
     return {
-      kind: kinds.site, created_at: clock, content: '',
-      tags: [['d', draft.slug], ['title', draft.title], ['description', draft.body],
-        ...files.map(file => ['path', file.path, file.hash]), ['x', await aggregate(files), 'aggregate'], ['server', draft.server]],
+      kind: draft.site?.root ? kinds.root : kinds.site, created_at: clock, content: source?.content ?? '',
+      tags: [...(draft.site?.root ? [] : [['d', draft.slug]]), ['title', draft.title], ['description', draft.body],
+        ...paths.map(file => file.parts ?? ['path', file.path, file.hash]), ['x', await aggregate(paths), 'aggregate'],
+        ...blobServers(draft, plan).map(server => ['server', server]), ...preserved],
     };
   }
   if (draft.type === 'track') {
@@ -137,9 +147,9 @@ export async function template(draft, files, urls, clock = now()) {
 export function verifyReview(draft, files) {
   if (!['note', 'article', 'track', 'nsite'].includes(draft.type)) throw new Error('Choose a publication type.');
   if (!draft.relays.length) throw new Error('Choose at least one reviewed relay.');
-  if (draft.type !== 'note' && (!draft.title || !draft.slug)) throw new Error('Add a title and a stable identifier.');
-  if (draft.type === 'nsite' && (!slugValid(draft.slug) || !files.some(file => file.path === '/index.html'))) {
-    throw new Error('An nsite needs a lowercase identifier of up to 13 characters and index.html.');
+  if (draft.type !== 'note' && (!draft.title || (!draft.slug && !draft.site?.root))) throw new Error('Add a title and a stable identifier.');
+  if (draft.type === 'nsite' && (!draft.site || draft.site.slug !== draft.slug)) {
+    throw new Error('Review the exact nsite address before publishing.');
   }
   if (draft.type === 'track' && (!draft.artist || !files[0]?.type.startsWith('audio/'))) throw new Error('Add an artist and an audio file before reviewing this release.');
   if (['track', 'nsite'].includes(draft.type) && !draft.server) throw new Error('Choose a Blossom server for the selected files.');
@@ -149,31 +159,65 @@ export function verifyReview(draft, files) {
 export function jobId(author, draft, files) {
   return digest(enc.encode(JSON.stringify({ author, draft, files: files.map(file => [file.path, file.hash]) })));
 }
-export async function execute({ draft, files, signer, transport, previous, checkpoint, upload = uploadVerified }) {
+function blobServers(draft, plan) {
+  return siteServers([draft.server, ...(draft.site?.servers ?? []), ...[plan?.source, plan?.current].filter(Boolean)
+    .flatMap(event => tags(event, 'server').map(parts => parts[1]))]);
+}
+
+export async function execute({ draft, files, signer, transport, previous, checkpoint, upload = uploadVerified,
+  known, backup, verifyFiles = verifySavedFiles }) {
   verifyReview(draft, files);
+  const plan = draft.site ? planSite(draft.site, signer.pubkey, files, backup) : null;
   const fingerprint = await jobId(signer.pubkey, draft, files);
   const job = previous?.id === fingerprint ? structuredClone(previous) : {
     id: fingerprint, account: signer.pubkey, type: draft.type, title: draft.title, createdAt: Date.now(), status: 'reviewed', uploads: {}, attempts: [],
   };
-  for (const file of files) {
-    if (job.uploads[file.hash]) continue;
-    job.uploads[file.hash] = await upload(file, draft.server, signed => signer.sign(signed));
-    job.status = 'uploading';
-    await checkpoint(job);
+  const sign = async value => checkSignature(value, await signer.sign(structuredClone(value)), signer.pubkey);
+  const verifyHead = async () => assertHeads(
+    await siteHeads(transport, [...draft.relays, ...draft.site.readRelays], draft.site), draft.relays, plan.current, known, job.event,
+  );
+  if (plan) {
+    await verifyHead();
+    await verifyFiles([...plan.paths.values()].filter(file => !file.bytes || job.uploads[file.hash]), blobServers(draft, plan));
+    job.address = [draft.site.root ? kinds.root : kinds.site, signer.pubkey, draft.slug].join(':');
+    job.baseline = plan.current;
+    job.action = draft.site.mode;
   }
-  job.event ??= await signer.sign(await template(draft, files, job.uploads));
+  const pending = (plan?.uploads ?? files).filter(file => !job.uploads[file.hash]);
+  for (let offset = 0; offset < pending.length; offset += 32) {
+    const batch = pending.slice(offset, offset + 32);
+    let authorized;
+    const approve = async request => {
+      if (batch.length === 1) return sign(request);
+      if (!authorized || now() + 25 >= Number(tag(authorized, 'expiration'))) authorized = await sign(uploadAuth(batch, draft.server));
+      return authorized;
+    };
+    for (const file of batch) {
+      if (job.uploads[file.hash]) continue;
+      job.uploads[file.hash] = await upload(file, draft.server, approve);
+      job.status = 'uploading';
+      await checkpoint(job);
+    }
+  }
+  const unsigned = await template(draft, files, job.uploads,
+    job.event?.created_at ?? Math.max(now(), (plan?.current?.created_at ?? 0) + 1), plan);
+  job.event = job.event ? checkSignature(unsigned, job.event, signer.pubkey) : await sign(unsigned);
   job.status = 'signed';
   await checkpoint(job);
+  if (plan) await verifyHead();
   const outcomes = await Promise.all(draft.relays.map(async url => {
     try {
-      const entry = await transport.publish(url, job.event, { authPubkey: signer.pubkey, signAuth: value => signer.sign(value) });
-      return { url, accepted: entry.accepted, verified: entry.verified === true, code: entry.code };
+      const entry = await transport.publish(url, job.event, { authPubkey: signer.pubkey, signAuth: sign });
+      if (!plan || !entry.accepted) return { url, accepted: entry.accepted, verified: !plan && entry.verified === true, code: entry.code };
+      const [head] = await siteHeads(transport, [url], draft.site);
+      const verified = head.complete && head.winner?.id === job.event.id;
+      return { url, accepted: true, verified, code: verified ? entry.code : 'current-version-unverified' };
     } catch (error) { return { url, accepted: false, verified: false, code: error.code || 'unavailable' }; }
   }));
   job.attempts = outcomes;
   job.status = outcomes.every(item => item.verified) ? 'verified' : outcomes.some(item => item.verified)
     ? 'partially-verified' : outcomes.some(item => item.accepted) ? 'accepted-unverified' : 'not-delivered';
-  job.url = draft.type === 'nsite' ? siteURL(signer.pubkey, draft.slug) : '';
+  job.url = plan ? siteURL(signer.pubkey, draft.slug, nip19.npubEncode(signer.pubkey)) : '';
   await checkpoint(job);
   return job;
 }

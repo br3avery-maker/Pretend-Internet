@@ -16,7 +16,7 @@ export function webURL(value) {
 export function siteURL(pubkey, key, npub) {
   if (!validPubkey(pubkey)) return '';
   if (!key) return /^npub1[a-z0-9]+$/.test(npub) ? `https://${npub}.nsite.lol/` : '';
-  if (!/^[a-z0-9](?:[a-z0-9-]{0,11}[a-z0-9])?$/.test(key)) return '';
+  if (!/^[a-z0-9-]{1,13}$/.test(key) || key.endsWith('-')) return '';
   const label = BigInt('0x' + pubkey).toString(36).padStart(50, '0');
   const joined = label + key;
   return joined.length <= 63 ? `https://${joined}.nsite.lol/` : '';

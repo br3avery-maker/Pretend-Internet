@@ -1,6 +1,6 @@
 import { button, el, heading, icon, label, link, modal, muted, query, route, run, setStatus, status } from '../lib/dom.js';
 import { groupSites, kinds, matchesWords, siteURL, tag } from '../lib/model.js';
-import { cached, npub, preferences, profileDirectory, reloadCatalog, shortKey } from '../lib/nostr.js';
+import { cached, npub, parseKey, preferences, profileDirectory, refreshIdentity, reloadCatalog, shortKey } from '../lib/nostr.js';
 import { saveCollections, setting, toggleList } from '../lib/store.js';
 
 const siteKinds = [kinds.root, kinds.site];
@@ -11,15 +11,18 @@ const isGame = site => site.category === 'Game' || suggested.get(site.slug)?.rep
 function siteRow(site, author, arcade, best) {
   return el('article', { class: 'entry stack-tight' },
     el('div', { class: 'split' }, el('h3', {}, link(site.title, localPath(site))),
-      arcade && siteLink(site) && el('a', { class: 'button primary', href: siteLink(site), target: '_blank', rel: 'noopener noreferrer' }, 'Play')),
+      siteLink(site) && el('a', { class: arcade ? 'button primary' : 'button secondary', href: siteLink(site), target: '_blank', rel: 'noopener noreferrer' }, arcade ? 'Play' : 'Open site')),
     muted([author, site.files ? `${site.files} declared files` : '', site.versions.length > 1 ? `${site.versions.length} observed versions` : ''].filter(Boolean).join(' · ')),
     site.slug === 'mojisurvivor' && best && el('p', {}, 'Published high score: ' + best),
     site.description && el('p', {}, site.description.slice(0, 330)));
 }
 async function catalog(main, arcade) {
-  const author = setting('account', '');
-  const labelText = author ? (await preferences(author)).profile.name || shortKey(author) : 'All publishers';
+  let author = setting('account', '');
+  const authorLine = muted(author ? (await preferences(author)).profile.name || shortKey(author) : 'All publishers');
   const notice = status();
+  const publisher = el('input', { type: 'search', placeholder: 'npub1…', spellcheck: 'false', autocapitalize: 'none' });
+  const find = el('button', { class: 'secondary' }, 'Find published nsites');
+  const lookup = el('form', {}, label('Publisher npub', publisher), find);
   const filter = el('input', { type: 'search', placeholder: arcade ? 'Search games' : 'Search sites, publishers, tags', 'aria-label': arcade ? 'Search games' : 'Search sites' });
   const saved = el('input', { type: 'checkbox' });
   const results = el('section', { class: 'stack-tight', 'aria-label': 'Results' });
@@ -54,10 +57,22 @@ async function catalog(main, arcade) {
     await load();
     setStatus(notice, result.reached ? `${result.count} signed events returned by ${result.reached} relays.` : 'No relays completed the query. Showing cached results.');
   }));
+  lookup.addEventListener('submit', run(find, notice, async () => {
+    author = parseKey(publisher.value);
+    authorLine.textContent = shortKey(author);
+    setStatus(notice, 'Looking up signed nsite manifests.');
+    await load();
+    await refreshIdentity(author);
+    const result = await reloadCatalog(siteKinds, author);
+    authorLine.textContent = (await preferences(author)).profile.name || shortKey(author);
+    await load();
+    setStatus(notice, result.reached ? (sites.length ? 'Found ' + sites.length + ' published ' + (sites.length === 1 ? 'nsite.' : 'nsites.')
+      : 'The relays checked returned no nsites for this account.') : 'The relay lookup did not complete. Showing previously found sites.');
+  }));
   filter.addEventListener('input', draw);
   for (const control of [saved, showHidden]) control.addEventListener('change', draw);
-  main.replaceChildren(heading(arcade ? 'Arcade' : 'Discover', refresh), el('div', { class: 'split' }, muted(labelText), link('Switch profile', route('profile'))),
-    filter, el('div', { class: 'row' }, el('label', { class: 'check' }, saved, 'Saved'), el('label', { class: 'check' }, showHidden, 'Hidden publishers')),
+  main.replaceChildren(heading(arcade ? 'Arcade' : 'Discover', refresh), el('div', { class: 'split' }, authorLine, link('Switch profile', route('profile'))),
+    !arcade && lookup, filter, el('div', { class: 'row' }, el('label', { class: 'check' }, saved, 'Saved'), el('label', { class: 'check' }, showHidden, 'Hidden publishers')),
     notice, results);
   await load();
   if (query.get('focus')) filter.focus();
@@ -99,6 +114,7 @@ async function project(main) {
   main.replaceChildren(link('‹ Discover', route('discover')), heading(site.title),
     muted(`Published by ${publisher}`), site.description && el('p', {}, site.description),
     el('div', { class: 'row' }, url ? el('a', { class: 'button primary', href: url, target: '_blank', rel: 'noopener noreferrer' }, isGame(site) ? 'Play' : 'Open site') : muted('This site uses an address the configured gateway cannot open.'),
+      setting('publishing-account')?.pubkey === site.event.pubkey && link('Update nsite', route('publish', { site: site.address }), 'button'),
       favorite, button('Add to collection', () => picker.showModal()), hidden),
     message, el('h2', {}, 'Observed versions'), el('ul', { class: 'stack-tight' },
       site.versions.map(event => el('li', {}, new Date(event.created_at * 1000).toLocaleDateString(), ' · ', el('code', {}, event.id)))),

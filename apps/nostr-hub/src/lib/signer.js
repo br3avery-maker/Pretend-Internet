@@ -2,15 +2,30 @@ import { BunkerSigner, createNostrConnectURI, parseBunkerInput } from 'nostr-too
 import { generateSecretKey, getEventHash, getPublicKey } from 'nostr-tools/pure';
 import { checkSignature, endpoints } from './nostr.js';
 import { validPubkey } from './model.js';
+import { drop, get, put } from './store.js';
+
+const sessionId = 'remote-signer';
+const sessionData = (owner, pointer) => new TextEncoder().encode(JSON.stringify([owner, pointer]));
+export const forgetRemoteSession = () => drop('connections', sessionId);
+
+async function persistRemoteSession(owner, bp, clientKey) {
+  // Only the app's delegation key is stored, with a non-extractable wrapping key.
+  const pointer = { pubkey: bp.pubkey, relays: [...bp.relays], secret: null };
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: sessionData(owner, pointer) }, key, clientKey);
+  await put('connections', { id: sessionId, owner, pointer, key, iv, ciphertext });
+}
+
 
 function withTimeout(operation, duration, message) {
   let timer;
   return Promise.race([operation, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), duration); })])
     .finally(() => clearTimeout(timer));
 }
-async function identify(provider, close = async () => {}) {
+async function identify(provider, close = async () => {}, identifyTimeout = 45000) {
   try {
-    const pubkey = await withTimeout(provider.getPublicKey(), 45000, 'The signer did not return a public key in time.');
+    const pubkey = await withTimeout(provider.getPublicKey(), identifyTimeout, 'The signer did not return a public key in time.');
     if (!validPubkey(pubkey)) throw new Error('The signer returned an invalid public key.');
     return {
       pubkey, close,
@@ -24,6 +39,31 @@ async function identify(provider, close = async () => {}) {
 export function extensionSigner() {
   if (!globalThis.nostr?.getPublicKey || !globalThis.nostr?.signEvent) throw new Error('This browser has no Nostr extension. Use Connect to Amber or another remote signer.');
   return identify(globalThis.nostr);
+}
+
+async function useRemoteSigner(provider, key, identifyTimeout) {
+  const verified = await identify(provider, async () => {
+    try { await provider.close(); } finally { key.fill(0); }
+  }, identifyTimeout);
+  return { ...verified, saveSession: () => persistRemoteSession(verified.pubkey, provider.bp, key) };
+}
+
+export async function restoreRemoteSession(owner) {
+  const saved = await get('connections', sessionId);
+  if (saved?.owner !== owner || !validPubkey(saved.pointer?.pubkey)
+      || !Array.isArray(saved.pointer.relays) || !saved.pointer.relays.length
+      || endpoints(saved.pointer.relays).length !== saved.pointer.relays.length) {
+    throw new Error('The saved remote signer session is unavailable.');
+  }
+  const key = new Uint8Array(await crypto.subtle.decrypt({
+    name: 'AES-GCM', iv: saved.iv, additionalData: sessionData(owner, saved.pointer),
+  }, saved.key, saved.ciphertext));
+  try {
+    const connected = await useRemoteSigner(BunkerSigner.fromBunker(key, saved.pointer, { skipSwitchRelays: true }), key, 12000);
+    if (connected.pubkey === owner) return connected;
+    await connected.close();
+    throw new Error('The remote signer returned a different account.');
+  } catch (error) { key.fill(0); throw error; }
 }
 
 // Adapted from the direct Android handoff in MojiSurvivor's Nostr engine.
@@ -78,7 +118,7 @@ export function pairing(relay) {
   const timer = setTimeout(() => abort.abort(new Error('The connection expired. Start a new pairing.')), 120000);
   // The active client stays on this page while the phone switches to the signer.
   const connected = BunkerSigner.fromURI(secretKey, uri, { skipSwitchRelays: true }, abort.signal)
-    .then(provider => identify(provider, async () => { try { await provider.close(); } finally { secretKey.fill(0); } }))
+    .then(provider => useRemoteSigner(provider, secretKey))
     .catch(error => { secretKey.fill(0); throw error; })
     .finally(() => clearTimeout(timer));
   return { uri, connected, cancel: () => abort.abort(new Error('Pairing cancelled.')) };
@@ -98,5 +138,5 @@ export async function pasteBunker(uri) {
     }
     throw error;
   }
-  return identify(provider, close);
+  return useRemoteSigner(provider, secretKey);
 }

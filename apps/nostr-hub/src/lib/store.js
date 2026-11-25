@@ -10,11 +10,18 @@ export function setSetting(key, value) {
 }
 function database() {
   connection ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open('pretend-internet-nostr', 1);
-    request.onupgradeneeded = () => {
-      for (const name of ['events', 'books', 'files', 'receipts']) request.result.createObjectStore(name, { keyPath: 'id' });
+    const request = indexedDB.open('pretend-internet-nostr', 2);
+    request.onupgradeneeded = event => {
+      if (event.oldVersion < 1) {
+        for (const name of ['events', 'books', 'files', 'receipts']) request.result.createObjectStore(name, { keyPath: 'id' });
+      }
+      request.result.createObjectStore('connections', { keyPath: 'id' });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => { request.result.close(); connection = undefined; };
+      resolve(request.result);
+    };
+    request.onblocked = () => { connection = undefined; reject(new Error('Close older Pretend Internet tabs before continuing.')); };
     request.onerror = () => reject(request.error);
   });
   return connection;

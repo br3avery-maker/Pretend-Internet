@@ -1,17 +1,17 @@
 # WebToApp import
 
 In WebToApp, go to **My Apps → ⋮ → Data Backup → Import Data** and choose
-`Pretend-Internet-WebToApp.zip`. Open the project entry **Pretend Internet**
-and use **Build APK** for an Android install. The archive carries one app,
-its launcher icon, its local HTML project, and its WebView and APK export
-settings. WebToApp deduplicates same-name HTML projects during backup import.
-If this app is already present, use the existing project to preserve its data
-and signing identity for updates.
+`Pretend-Internet-WebToApp-0.2.0.zip`. Use **Build APK** on the new
+**Pretend Internet 0.2.0** project. Its versioned name lets WebToApp import
+the project alongside the earlier same-package project. It carries the
+launcher icon, local app files, WebView settings, and APK settings.
 
-The project uses System WebView, the `index.html` entry, and local HTTP on
-port 17886. It keeps browser storage, uses history for Android Back, and
-opens external site links in the browser. Maintain the package name
-`xyz.chaoticka.pretendinternet`, port, and build signing key for updates.
+The project uses System WebView and local HTTP on port 17886. It keeps
+browser storage, uses history for Android Back, and opens external site
+links in the browser. Its Android version code is 2. An in-place APK
+update requires the original signing key and package name
+`xyz.chaoticka.pretendinternet`. APK update and data preservation still
+need an Android device check. Keep the older project while testing.
 
 To sign on the same phone, use **Publish → Connect signer → Open Amber**.
 Approve the public-key request in Amber, return, and paste the key. For a
@@ -29,7 +29,8 @@ From `apps/nostr-hub` with Node and rsvg-convert installed:
 npm ci
 npm run build
 rsvg-convert -w 512 -h 512 -o /tmp/pretend-internet-icon.png public/icons/icon.svg
-python3 scripts/package-webtoapp.py dist /tmp/pretend-internet-icon.png /tmp/Pretend-Internet-WebToApp.zip
+python3 scripts/package-webtoapp.py dist /tmp/pretend-internet-icon.png /tmp/Pretend-Internet-WebToApp-0.2.0.zip \
+  --version-code 2 --project-name "Pretend Internet 0.2.0"
 ```
 
 The archive follows the WebToApp v5 backup contract from

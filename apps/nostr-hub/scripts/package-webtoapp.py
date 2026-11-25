@@ -22,7 +22,11 @@ def main():
     parser.add_argument("dist", type=Path, help="Compiled app directory")
     parser.add_argument("icon", type=Path, help="512 × 512 launcher PNG")
     parser.add_argument("output", type=Path, help="New WebToApp import ZIP")
+    parser.add_argument("--version-code", type=int, default=1, help="Android APK version code")
+    parser.add_argument("--project-name", default=NAME, help="Import name shown in WebToApp")
     args = parser.parse_args()
+    if not 1 <= args.version_code <= 2100000000 or not args.project_name.strip():
+        parser.error("Use a positive Android version code and a nonempty project name.")
     dist = args.dist.resolve()
     if args.output.resolve().is_relative_to(dist):
         parser.error("The ZIP must be outside the build directory.")
@@ -47,7 +51,7 @@ def main():
     resource_root = "resources/html/1/"
     app = {
         "id": 1,
-        "name": NAME,
+        "name": args.project_name.strip(),
         "url": "",
         "iconPath": ICON_PATH,
         "packageName": PACKAGE,
@@ -72,7 +76,8 @@ def main():
         "apkExportConfig": {
             "customPackageName": PACKAGE,
             "customVersionName": version,
-            "customVersionCode": 1,
+            "customVersionCode": args.version_code,
+            "autoVersionBump": True,
             "engineType": "SYSTEM_WEBVIEW",
             "iconBackgroundColor": "#000000",
         },

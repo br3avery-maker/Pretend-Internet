@@ -19,7 +19,7 @@ test('groups revisions by author and slug using only signed-event metadata field
   assert.equal(result[0].category, 'Game');
   assert.equal(result[0].files, 1);
   assert.match(siteURL(author, 'game'), /^https:\/\/[a-z0-9]+game\.nsite\.lol\/$/);
-  assert.equal(siteURL(author, '-bad'), '');
+  assert.equal(siteURL(author, 'bad-'), '');
 });
 
 test('normalizes HTML and folder ZIP for review, hashes each file and rejects unsafe paths', async () => {
@@ -41,12 +41,15 @@ test('reuses the identical reviewed event and uploads on retry, and checks indep
   let available = false;
   const signer = { pubkey: getPublicKey(secret), sign: async value => { signs++; return finalizeEvent(value, secret); } };
   const draft = { type: 'nsite', title: 'Test', slug: 'test', body: '', server: 'https://blossom.fixture.example', relays: ['wss://relay.fixture.example'] };
+  draft.site = { owner: signer.pubkey, mode: 'create', root: false, slug: 'test', servers: [], readRelays: ['wss://read.fixture.example'] };
   const files = await siteFiles([new File(['<h1>Test</h1>'], 'index.html')]);
+  let sent;
   const options = {
-    draft, files, signer, checkpoint: async () => {},
+    draft, files, signer, checkpoint: async () => {}, verifyFiles: async () => {},
     upload: async () => { uploads++; return 'https://blossom.fixture.example/file'; },
     transport: {
-      async publish() { return { accepted: true, verified: available, code: 'accepted' }; },
+      async query() { return { status: 'complete', events: available && sent ? [sent] : [] }; },
+      async publish(_url, value) { sent = value; return { accepted: true, verified: available, code: 'accepted' }; },
     },
   };
   const initial = await execute(options);
@@ -75,4 +78,44 @@ test('Markdown uses headings without dropping a preface or collapsing chapter id
   assert.deepEqual(chapters.map(chapter => chapter.title), ['Start', 'First', 'Second']);
   assert.deepEqual(chapters.map(chapter => chapter.id), ['1', '2', '3']);
   assert.match(chapters[0].text, /preface/);
+});
+
+
+test('keeps the owner and address on partial update, refuses a collision or foreign signer, and restores a signed baseline', async () => {
+  const key = generateSecretKey();
+  const pubkey = getPublicKey(key);
+  const signer = { pubkey, sign: async value => finalizeEvent(value, key) };
+  const files = await siteFiles([new File([zipSync({ 'index.html': strToU8('original'), 'style.css': strToU8('body{}'), 'icon.svg': strToU8('<svg/>') })], 'site.zip')]);
+  const server = 'https://blossom.fixture.example';
+  const baseline = finalizeEvent({ kind: 35128, content: '', created_at: Math.floor(Date.now()/1000), tags: [
+    ['d', 'test'], ['title', 'Original'], ['t', 'arcade'], ['server', server], ...files.map(file => ['path', file.path, file.hash]),
+  ] }, key);
+  let head = baseline;
+  let writes = 0;
+  let uploaded = 0;
+  const site = { owner: pubkey, mode: 'update', root: false, slug: 'test', baseline, servers: [server], readRelays: ['wss://read.fixture.example'] };
+  const draft = { type: 'nsite', title: 'Original', slug: 'test', body: '', server, relays: ['wss://relay.fixture.example'], site };
+  const picked = await siteFiles([new File(['revised'], 'index.html')], { partial: true });
+  const saved = [];
+  const options = { draft, files: picked, signer, checkpoint: async () => {},
+    upload: async () => { uploaded++; return server + '/' + picked[0].hash; }, verifyFiles: async paths => { saved.push(paths.map(file => file.path).sort()); },
+    transport: { async query() { return { status: 'complete', events: [head] }; },
+      async publish(_url, value) { writes++; head = value; return { accepted: true, code: 'accepted' }; } } };
+  await assert.rejects(execute({ ...options, signer: { pubkey: author } }), /does not match/);
+  await assert.rejects(execute({ ...options, draft: { ...draft, site: { ...site, mode: 'create' } } }), /already been published/);
+  assert.equal(writes + uploaded, 0);
+  const changed = await execute(options);
+  assert.equal(changed.status, 'verified');
+  assert.equal(changed.event.created_at, baseline.created_at + 1);
+  assert.equal(changed.event.pubkey, pubkey);
+  assert.ok(changed.event.tags.some(parts => parts[0] === 't' && parts[1] === 'arcade'));
+  assert.deepEqual(saved[0], ['/icon.svg', '/style.css']);
+  await assert.rejects(execute(options), /live site changed/);
+  const restored = await execute({ ...options, files: [], backup: changed.baseline,
+    draft: { ...draft, site: { ...site, mode: 'restore', baseline: changed.event, restore: baseline } } });
+  assert.equal(restored.url, changed.url);
+  assert.equal(restored.event.created_at, changed.event.created_at + 1);
+  assert.deepEqual(restored.event.tags.filter(parts => parts[0] === 'path'), baseline.tags.filter(parts => parts[0] === 'path'));
+  assert.equal(uploaded, 1);
+  assert.equal(writes, 2);
 });

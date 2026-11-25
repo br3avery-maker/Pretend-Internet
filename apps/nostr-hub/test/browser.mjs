@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
 import { finalizeEvent, generateSecretKey, getPublicKey, verifyEvent } from 'nostr-tools/pure';
 import { npubEncode } from 'nostr-tools/nip19';
+import { zipSync } from 'fflate';
+import { decrypt, encrypt, getConversationKey } from 'nostr-tools/nip44';
 import { matchFilter } from 'nostr-tools/filter';
 
 const build = resolve(import.meta.dirname, '../dist');
@@ -30,6 +32,11 @@ const secret = generateSecretKey();
 const pubkey = getPublicKey(secret);
 const another = generateSecretKey();
 const secondaryPubkey = getPublicKey(another);
+const brokerKey = generateSecretKey();
+const broker = getPublicKey(brokerKey);
+let client;
+let resumed;
+let connections = 0;
 const time = Math.floor(Date.now() / 1000) - 8;
 const sign = (kind, content, tags = [], key = secret) => finalizeEvent({ kind, content, tags, created_at: time }, key);
 const events = [
@@ -56,6 +63,7 @@ const context = await browser.newContext({
 });
 await context.routeWebSocket(/^wss:\/\//, connection => {
   let authenticated = false;
+  const subscriptions = new Map();
   connection.onMessage(data => {
     const [verb,id,filter] = JSON.parse(data);
     if (verb === 'REQ') {
@@ -64,9 +72,12 @@ await context.routeWebSocket(/^wss:\/\//, connection => {
         connection.send(JSON.stringify(['CLOSED',id,'auth-required: authenticate to read this event']));
         return;
       }
+      subscriptions.set(id,filter);
       for (const event of events.filter(event => matchFilter(filter,event)).slice(0,filter.limit ?? 100))
         connection.send(JSON.stringify(['EVENT',id,event]));
       connection.send(JSON.stringify(['EOSE',id]));
+    } else if (verb === 'CLOSE') {
+      subscriptions.delete(id);
     } else if (verb === 'AUTH') {
       assert.equal(verifyEvent(id),true);
       assert.equal(id.kind,22242);
@@ -77,6 +88,29 @@ await context.routeWebSocket(/^wss:\/\//, connection => {
       connection.send(JSON.stringify(['OK',id.id,true,'']));
     } else if (verb === 'EVENT') {
       assert.equal(verifyEvent(id),true);
+      if (id.kind === 24133) {
+        assert.equal(id.tags.find(parts => parts[0] === 'p')[1],broker);
+        const key = getConversationKey(brokerKey,id.pubkey);
+        const request = JSON.parse(decrypt(id.content,key));
+        let result;
+        if (request.method === 'connect') {
+          assert.equal(request.params[1],'fixture-consent');
+          client = id.pubkey;
+          connections++;
+          result = 'ack';
+        } else {
+          assert.equal(id.pubkey,client);
+          if (request.method === 'get_public_key') { resumed = id.pubkey; result = pubkey; }
+          if (request.method === 'sign_event') result = JSON.stringify(finalizeEvent(JSON.parse(request.params[0]),secret));
+        }
+        const reply = finalizeEvent({ kind:24133, content:encrypt(JSON.stringify({ id:request.id,result }),key),
+          tags:[['p',id.pubkey]], created_at:Math.floor(Date.now()/1000) },brokerKey);
+        connection.send(JSON.stringify(['OK',id.id,true,'']));
+        for (const [sub,filter] of subscriptions) {
+          if (matchFilter(filter,reply)) connection.send(JSON.stringify(['EVENT',sub,reply]));
+        }
+        return;
+      }
       writes.push(id);
       events.unshift(id);
       connection.send(JSON.stringify(['OK',id.id,true,'']));
@@ -259,6 +293,12 @@ try {
   await button('Save changes').click();
   await page.getByRole('heading',{name:'Fixture shelf'}).waitFor();
 
+  await open('discover.html');
+  await page.getByLabel('Publisher npub').fill(npubEncode(pubkey));
+  await button('Find published nsites').click();
+  await page.getByText('Found 1 published nsite.').waitFor();
+  assert.ok((await link('Open site').getAttribute('href')).startsWith('https://'));
+
   await open('publish.html');
   await button('Connect signer').click();
   await button('Use browser signer').click();
@@ -266,7 +306,7 @@ try {
   await page.getByLabel('Publication type').selectOption('nsite');
   await page.getByLabel('Title',{exact:true}).fill('Disposable browser fixture');
   await page.getByLabel('Stable identifier for updates').fill('test-site');
-  const siteFile = page.getByLabel('HTML or ZIP');
+  const siteFile = page.getByLabel('HTML, ZIP, Markdown or text');
   const replacementRequired = 'Choose valid replacement files before publishing.';
   const review = page.getByRole('dialog',{name:'Review public publication'});
   const oldSite = Buffer.from('<h1>Old selection</h1>');
@@ -293,13 +333,14 @@ try {
   assert.equal(await page.getByText(/1 staged files/).count(),0);
   await page.reload();
   await page.getByText(replacementRequired).waitFor();
-  await button('Connect signer').click();
-  await button('Use browser signer').click();
   await page.getByText(/^Signing as/).filter({visible:true}).waitFor();
   await button('Review publication').click();
   assert.equal(await review.count(),0);
-  await chooseHTML(newSite);
-  await page.getByText(/1 staged files/).waitFor();
+  const style = Buffer.from('body { font-family: sans-serif; }');
+  const logo = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+  await siteFile.setInputFiles({name:'site.zip',mimeType:'application/zip',
+    buffer:Buffer.from(zipSync({'index.html':newSite,'style.css':style,'assets/logo.svg':logo}))});
+  await page.getByText(/3 staged files/).waitFor();
   await page.getByLabel('Blossom server').selectOption('https://blossom.fixture.example');
   await button('Review publication').click();
   await page.getByRole('dialog',{name:'Review public publication'}).waitFor();
@@ -307,25 +348,59 @@ try {
   assert.equal(uploads,0,'Review does not upload');
   await snap('publish-review');
   await button('Sign and publish').click();
-  await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
+  const verifiedSite = 'The reviewed version is current on every selected relay. Its Blossom files were verified.';
+  await page.getByText(verifiedSite).waitFor();
   assert.equal(writes.length,1);
   assert.equal(writes[0].kind,35128);
-  assert.equal(uploads,1);
+  assert.equal(uploads,3);
   assert.equal(authentications,1);
-  assert.deepEqual([...blobMap.values()],[newSite]);
+  assert.ok([...blobMap.values()].some(data => data.equals(newSite)));
   await page.getByText(/Verified by relay readback/).waitFor();
   await page.reload();
   await page.getByText(/Verified by relay readback/).waitFor();
 
+  await button('Review publication').click();
+  await page.getByText('This address has already been published. Choose Update existing nsite.').waitFor();
+  await page.getByLabel('Nsite action').selectOption('update');
+  await page.getByLabel('Published nsite').selectOption('35128:' + pubkey + ':test-site');
+  const revised = Buffer.from('<h1>Changed index only</h1>');
+  await page.getByLabel('File or ZIP of changes').setInputFiles({name:'index.html',mimeType:'text/html',buffer:revised});
+  await page.getByText(/1 staged files/).waitFor();
+  await button('Review publication').click();
+  await review.getByText('Change /index.html').waitFor();
+  await review.getByText('Keep /style.css').waitFor();
+  await review.getByText('Keep /assets/logo.svg').waitFor();
+  assert.ok(await review.getByText(npubEncode(pubkey),{exact:true}).count());
+  await button('Sign and publish').click();
+  await page.getByText(verifiedSite).waitFor();
+  assert.equal(writes.length,2);
+  const pathTags = event => event.tags.filter(parts => parts[0] === 'path');
+  assert.deepEqual(pathTags(writes[1]).filter(parts => parts[1] !== '/index.html'),
+    pathTags(writes[0]).filter(parts => parts[1] !== '/index.html'));
+  assert.equal(writes[1].pubkey, writes[0].pubkey);
+  assert.equal(writes[1].tags.find(parts => parts[0] === 'd')[1], 'test-site');
+
+  await page.getByLabel('Nsite action').selectOption('restore');
+  await button('Find my published nsites').click();
+  await page.getByLabel('Saved version to restore').selectOption(writes[0].id);
+  await button('Review publication').click();
+  await review.getByText('Change /index.html').waitFor();
+  await button('Sign and publish').click();
+  await page.getByText(verifiedSite).waitFor();
+  assert.equal(writes.length,3);
+  assert.deepEqual(pathTags(writes[2]),pathTags(writes[0]));
+
   await page.getByLabel('Publication type').selectOption('note');
   await page.getByLabel('Note',{exact:true}).fill('Amber test? & OLED');
-  await button('Connect signer').click();
+  await button('Change signer').click();
   await link('Open Amber').click();
   let handoff = await page.evaluate(() => window.lastAmberURI);
   assert.equal(new URL(handoff).searchParams.get('type'),'get_public_key');
   assert.equal(new URL(handoff).searchParams.has('callbackUrl'),false);
   await page.getByLabel('Amber public key').fill(npubEncode(pubkey));
   await button('Use Amber public key').click();
+  await page.locator('main').getByText(/approval required for each signature/).waitFor();
+  await page.reload();
   await page.locator("main").getByText(/approval required for each signature/).waitFor();
   await button('Review publication').click();
   const approval = page.getByRole('dialog',{name:'Sign in Amber'});
@@ -334,7 +409,7 @@ try {
   await approval.waitFor();
   await approval.getByRole('button',{name:'Close'}).click();
   await review.getByText('The Amber request was cancelled.').waitFor();
-  assert.equal(writes.length,1);
+  assert.equal(writes.length,3);
   await signAndPublish.click();
   for (const kind of [1,22242]) {
     await approval.getByRole('link',{name:'Open Amber'}).click();
@@ -351,18 +426,45 @@ try {
       await approval.getByLabel('Amber signature').fill(finalizeEvent({...template,content:'Wrong content'},secret).sig);
       await approval.getByRole('button',{name:'Use signature'}).click();
       await approval.getByText('The signature did not match this request or Amber account.').waitFor();
-      assert.equal(writes.length,1);
+      assert.equal(writes.length,3);
     }
     await approval.getByLabel('Amber signature').fill(finalizeEvent(template,secret).sig);
     await approval.getByRole('button',{name:'Use signature'}).click();
   }
   await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
-  assert.equal(writes.length,2);
+  assert.equal(writes.length,4);
   assert.equal(writes.at(-1).content,'Amber test? & OLED');
 
+  await button('Change signer').click();
+  const remote = page.getByRole('dialog',{name:'Connect a signer'});
+  await remote.getByText('Remote signer',{exact:true}).click();
+  await remote.getByText('Use a bunker link',{exact:true}).click();
+  await remote.getByLabel('Bunker connection link').fill('bunker://' + broker + '?relay=wss%3A%2F%2Fbroker.fixture.example&secret=fixture-consent');
+  await remote.getByRole('button',{name:'Connect bunker link'}).click();
+  await page.locator('main').getByText(/^Signing as/).waitFor();
+  resumed = undefined;
+  await page.reload();
+  await page.locator('main').getByText(/^Signing as/).waitFor();
+  assert.equal(resumed,client);
+  assert.equal(connections,1);
+  await page.getByLabel('Note',{exact:true}).fill('Remote session survived reload');
+  await button('Review publication').click();
+  await button('Sign and publish').click();
+  await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
+  assert.equal(writes.at(-1).content,'Remote session survived reload');
+  await page.getByLabel('Publication type').selectOption('nsite');
+  await page.getByLabel('Nsite action').selectOption('create');
+  await page.getByLabel('Title',{exact:true}).fill('');
+  await page.getByLabel('Stable identifier for updates').fill('');
+  await page.getByLabel('HTML, ZIP, Markdown or text').setInputFiles({name:'test.md',mimeType:'text/markdown',
+    buffer:Buffer.from('# A new story\n\nA formatted paragraph.')});
+  await page.waitForFunction(() => [...document.querySelectorAll('main label')].find(label => label.firstChild?.textContent === 'Title')?.querySelector('input').value === 'A new story');
+  assert.equal(await page.getByLabel('Stable identifier for updates').inputValue(),'a-new-story');
   assert.deepEqual(uncaught,[]);
   console.log('Mobile Chromium passed profiles, metadata-only discovery, game handoff, music playback, long-form writing, reader swipe and offline resume, Markdown curation, and disposable nsite signing and verification.');
   console.log('Review regressions passed: failed replacement stays blocked, relay readback authenticates, and music navigation survives a refresh.');
+  console.log('Nsite lifecycle passed npub lookup, Markdown autofill, owned multi-file creation, same-address update and restore.');
+  console.log('The authorized remote signer session survived reload and signed as the same account.');
   console.log('Direct Amber flow passed with a disposable proxy signer: launch URL, clipboard input, cancellation, signature binding and signed relay authentication.');
 } catch (error) {
   console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
