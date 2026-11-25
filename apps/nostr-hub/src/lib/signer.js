@@ -67,16 +67,17 @@ export async function restoreRemoteSession(owner) {
 }
 
 // Adapted from the direct Android handoff in MojiSurvivor's Nostr engine.
-function androidSignerURI(type, event) {
+function androidSignerURI(type, event, callbackURL) {
   const query = new URLSearchParams({ type, appName: 'Pretend Internet',
     compressionType: 'none', returnType: 'signature', id: crypto.randomUUID() });
   if (event) query.set('current_user', event.pubkey);
+  if (callbackURL) query.set('callbackUrl', callbackURL);
   // Amber decodes before splitting on the URI's query delimiter.
   const payload = event ? encodeURIComponent(JSON.stringify(event).replaceAll('?', '\\u003f')) : '';
   return `nostrsigner:${payload}?${query}`;
 }
 
-export const amberAccountURI = () => androidSignerURI('get_public_key');
+export const amberAccountURI = callbackURL => androidSignerURI('get_public_key', undefined, callbackURL);
 
 export function amberSigner(pubkey, request) {
   const session = new AbortController();
@@ -90,7 +91,7 @@ export function amberSigner(pubkey, request) {
       // Upload authorizations and multiple relay challenges can overlap.
       const signing = pending.then(() => {
         if (session.signal.aborted) throw new Error('Amber account disconnected.');
-        return request(androidSignerURI('sign_event', unsigned), session.signal, raw => {
+        return request(callbackURL => androidSignerURI('sign_event', unsigned, callbackURL), session.signal, raw => {
           const value = raw.trim();
           let event;
           if (/^[0-9a-f]{128}$/.test(value)) {
@@ -134,7 +135,7 @@ export async function pasteBunker(uri) {
   catch (error) {
     await close();
     if (/subscription closed/i.test(String(error?.message ?? error))) {
-      throw new Error('The bunker relay closed before Amber could answer. Try Open Amber for on-device signing.');
+      throw new Error('The bunker relay closed before Amber could answer. On Android, use Sign in with Amber from your profile.');
     }
     throw error;
   }

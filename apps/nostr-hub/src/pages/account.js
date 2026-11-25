@@ -1,7 +1,8 @@
-import { button, el, heading, label, link, modal, muted, route, run, setStatus, status } from '../lib/dom.js';
+import { button, el, heading, label, link, modal, muted, query, run, setStatus, status } from '../lib/dom.js';
 import { bootstrap, endpoints, npub, parseKey, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
 import { kinds } from '../lib/model.js';
 import { saveAccount, setting, setSetting } from '../lib/store.js';
+import { accountSignIn } from './account-signin.js';
 
 function list(values, empty) {
   return values.length ? el('ul', { class: 'stack-tight' }, values.map(value => el('li', {}, el('code', {}, value)))) : muted(empty);
@@ -81,8 +82,11 @@ async function profiles(main) {
       el('div', { class: 'stack-tight' }, el('h3', {}, profile.name || shortKey(key)), muted(active === key ? 'Active browsing profile' : shortKey(key))),
       el('div', { class: 'row' }, more, active !== key && button('Use profile', () => { saveAccount(key); location.reload(); })));
   }));
-  main.replaceChildren(heading('Profiles'), ...(current?.profile.banner ? [el('img', { class: 'profile-banner', src: current.profile.banner, alt: '', referrerpolicy: 'no-referrer' })] : []),
+  const signIn = accountSignIn();
+  main.replaceChildren(heading('Profile'), signIn,
+    el('h2', {}, 'Browse other profiles'), ...(current?.profile.banner ? [el('img', { class: 'profile-banner', src: current.profile.banner, alt: '', referrerpolicy: 'no-referrer' })] : []),
     ...entries, active && button('Browse without a profile', () => { setSetting('account', ''); location.reload(); }),
-    form, link('Connect a signer in Publish', route('publish'), 'button'));
+    form);
+  if (query.has('signin')) signIn.focus();
 }
 export function render(main, page) { return page === 'network' ? network(main) : profiles(main); }

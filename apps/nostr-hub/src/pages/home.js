@@ -7,7 +7,7 @@ const sections = [
   ['music', 'Music', 'music', 'Play tracks and browse releases'],
   ['writing', 'Writing', 'book', 'Find and read published articles'],
   ['publish', 'Publish', 'bolt', 'Review and sign a public release'],
-  ['profile', 'Profiles', 'user', 'Browse a public Nostr account'],
+  ['profile', 'Profile', 'user', 'Sign in or browse other profiles'],
 ];
 export function render(main, page) {
   if (page === 'help') {
@@ -17,7 +17,7 @@ export function render(main, page) {
       el('h2', {}, 'Your local data'),
       el('p', {}, 'The browser keeps your saved profiles, collections, books, bookmarks, drafts, and relay cache. Clearing site data removes them from this browser. You can export a publish receipt from Publish.'),
       el('h2', {}, 'Going online'),
-      el('p', {}, 'Discover looks up public nsites by npub. Open takes you to a published site. To change one of your sites, connect its signer in Publish and choose Update existing nsite. Review the account, address, and file changes before signing.'),
+      el('p', {}, 'Discover looks up public nsites by npub. Open takes you to a published site. To change one of your sites, sign in from your profile, then choose Update existing nsite in Publish. Review the account, address, and file changes before signing.'),
       link('Back to Home', route('index'), 'button'));
     return;
   }

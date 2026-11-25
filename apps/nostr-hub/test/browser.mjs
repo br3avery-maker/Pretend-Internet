@@ -10,7 +10,8 @@ import { zipSync } from 'fflate';
 import { decrypt, encrypt, getConversationKey } from 'nostr-tools/nip44';
 import { matchFilter } from 'nostr-tools/filter';
 
-const build = resolve(import.meta.dirname, '../dist');
+const build = resolve(process.env.APP_BUILD_DIR || resolve(import.meta.dirname, '../dist'));
+const packaged = (await readFile(resolve(build, 'profile.html'), 'utf8')).includes('name="pretend-amber-return"');
 const types = { '.html':'text/html', '.css':'text/css', '.js':'text/javascript', '.json':'application/json', '.webp':'image/webp', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
 const server = createServer(async (request,response) => {
   try {
@@ -299,10 +300,14 @@ try {
   await page.getByText('Found 1 published nsite.').waitFor();
   assert.ok((await link('Open site').getAttribute('href')).startsWith('https://'));
 
+  await open('index.html');
+  await button('Open profile menu').click();
+  await page.getByRole('dialog').getByRole('link',{name:'Sign in',exact:true}).click();
+  await button('Sign in with browser signer').click();
+  await page.getByText('Signed in with a browser signer').waitFor();
   await open('publish.html');
-  await button('Connect signer').click();
-  await button('Use browser signer').click();
-  await page.getByText(/^Signing as/).filter({visible:true}).waitFor();
+  await page.getByText(/^Publishing as/).waitFor();
+  assert.equal(await button('Connect signer').count(),0);
   await page.getByLabel('Publication type').selectOption('nsite');
   await page.getByLabel('Title',{exact:true}).fill('Disposable browser fixture');
   await page.getByLabel('Stable identifier for updates').fill('test-site');
@@ -333,7 +338,7 @@ try {
   assert.equal(await page.getByText(/1 staged files/).count(),0);
   await page.reload();
   await page.getByText(replacementRequired).waitFor();
-  await page.getByText(/^Signing as/).filter({visible:true}).waitFor();
+  await page.getByText(/^Publishing as/).filter({visible:true}).waitFor();
   await button('Review publication').click();
   assert.equal(await review.count(),0);
   const style = Buffer.from('body { font-family: sans-serif; }');
@@ -362,7 +367,16 @@ try {
   await button('Review publication').click();
   await page.getByText('This address has already been published. Choose Update existing nsite.').waitFor();
   await page.getByLabel('Nsite action').selectOption('update');
-  await page.getByLabel('Published nsite').selectOption('35128:' + pubkey + ':test-site');
+  const selectedSite = page.getByLabel('Published nsite');
+  const selectedTitle = page.getByLabel('Title',{exact:true});
+  await selectedSite.selectOption('35128:' + pubkey + ':test-arcade');
+  assert.equal(await selectedTitle.inputValue(),'Test arcade');
+  await selectedTitle.fill('An edited arcade draft');
+  await selectedSite.selectOption('35128:' + pubkey + ':test-site');
+  assert.equal(await selectedTitle.inputValue(),'Disposable browser fixture');
+  await selectedSite.selectOption('35128:' + pubkey + ':test-arcade');
+  assert.equal(await selectedTitle.inputValue(),'An edited arcade draft');
+  await selectedSite.selectOption('35128:' + pubkey + ':test-site');
   const revised = Buffer.from('<h1>Changed index only</h1>');
   await page.getByLabel('File or ZIP of changes').setInputFiles({name:'index.html',mimeType:'text/html',buffer:revised});
   await page.getByText(/1 staged files/).waitFor();
@@ -390,63 +404,96 @@ try {
   assert.equal(writes.length,3);
   assert.deepEqual(pathTags(writes[2]),pathTags(writes[0]));
 
-  await page.getByLabel('Publication type').selectOption('note');
-  await page.getByLabel('Note',{exact:true}).fill('Amber test? & OLED');
-  await button('Change signer').click();
-  await link('Open Amber').click();
-  let handoff = await page.evaluate(() => window.lastAmberURI);
-  assert.equal(new URL(handoff).searchParams.get('type'),'get_public_key');
-  assert.equal(new URL(handoff).searchParams.has('callbackUrl'),false);
-  await page.getByLabel('Amber public key').fill(npubEncode(pubkey));
-  await button('Use Amber public key').click();
-  await page.locator('main').getByText(/approval required for each signature/).waitFor();
-  await page.reload();
-  await page.locator("main").getByText(/approval required for each signature/).waitFor();
-  await button('Review publication').click();
-  const approval = page.getByRole('dialog',{name:'Sign in Amber'});
-  const signAndPublish = review.getByRole('button',{name:'Sign and publish'});
-  await signAndPublish.click();
-  await approval.waitFor();
-  await approval.getByRole('button',{name:'Close'}).click();
-  await review.getByText('The Amber request was cancelled.').waitFor();
-  assert.equal(writes.length,3);
-  await signAndPublish.click();
-  for (const kind of [1,22242]) {
-    await approval.getByRole('link',{name:'Open Amber'}).click();
-    const next = await page.evaluate(() => window.lastAmberURI);
-    assert.notEqual(next,handoff);
-    handoff = next;
-    const request = new URL(handoff);
-    assert.equal(request.searchParams.get('type'),'sign_event');
-    const template = JSON.parse(decodeURIComponent(request.pathname));
-    assert.deepEqual(JSON.parse(decodeURIComponent(handoff.slice('nostrsigner:'.length)).split('?')[0]),template);
-    assert.equal(template.kind,kind);
-    assert.equal(template.pubkey,pubkey);
-    if (kind === 1) {
-      await approval.getByLabel('Amber signature').fill(finalizeEvent({...template,content:'Wrong content'},secret).sig);
-      await approval.getByRole('button',{name:'Use signature'}).click();
-      await approval.getByText('The signature did not match this request or Amber account.').waitFor();
-      assert.equal(writes.length,3);
+  if (packaged) {
+    await open('index.html');
+    await button('Open profile menu').click();
+    await page.getByRole('dialog').getByRole('link',{name:'Manage account'}).click();
+    await page.getByText('Change signer',{exact:true}).click();
+    await button('Switch account in Amber').click();
+    const getHandoff = () => page.evaluate(() => window.lastAmberURI);
+    function callbackTarget(handoff) {
+      const callback = new URL(new URL(handoff).searchParams.get('callbackUrl'));
+      assert.equal(callback.protocol,'pretend-internet-amber:');
+      assert.equal(callback.hostname,'oauth-return');
+      return new URL(callback.searchParams.get('url'));
     }
-    await approval.getByLabel('Amber signature').fill(finalizeEvent(template,secret).sig);
-    await approval.getByRole('button',{name:'Use signature'}).click();
-  }
-  await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
-  assert.equal(writes.length,4);
-  assert.equal(writes.at(-1).content,'Amber test? & OLED');
+    const signinHandoff = await getHandoff();
+    const signInPage = callbackTarget(signinHandoff);
+    assert.equal(new URL(signinHandoff).searchParams.get('type'),'get_public_key');
+    assert.equal(signInPage.pathname,'/profile.html');
+    assert.equal(signInPage.searchParams.get('signin'),'1');
+    const reply = (target, value) => page.evaluate(url => { location.href = url; }, target.href + encodeURIComponent(value));
+    const stale = new URL(signInPage.href);
+    stale.hash = '#amber-return=old:';
+    await reply(stale,npubEncode(secondaryPubkey));
+    await page.waitForFunction(() => location.hash === '');
+    assert.equal(await page.getByText('Signed in with a browser signer').count(),1);
+    await reply(signInPage,npubEncode(pubkey));
+    await page.getByText('Signed in with Amber').waitFor();
+    await page.reload();
+    await page.getByText('Signed in with Amber').waitFor();
 
-  await button('Change signer').click();
-  const remote = page.getByRole('dialog',{name:'Connect a signer'});
+    await open('publish.html');
+    await page.getByText(/^Publishing as/).waitFor();
+    await page.getByLabel('Publication type').selectOption('note');
+    await page.getByLabel('Note',{exact:true}).fill('Amber test? & OLED');
+    await button('Review publication').click();
+    const approval = page.getByRole('dialog',{name:'Approve in Amber'});
+    const send = review.getByRole('button',{name:'Sign and publish'});
+    await send.click();
+    await approval.waitFor();
+    assert.equal(await approval.locator('textarea, input').count(),0);
+    await approval.getByRole('button',{name:'Close'}).click();
+    await review.getByText('Amber request cancelled.').waitFor();
+    assert.equal(writes.length,3);
+
+    await send.click();
+    await approval.getByRole('link',{name:'Open Amber'}).click();
+    let handoff = await getHandoff();
+    let request = new URL(handoff);
+    let template = JSON.parse(decodeURIComponent(request.pathname));
+    await reply(callbackTarget(handoff),finalizeEvent({...template,content:'Wrong content'},secret).sig);
+    await review.getByText('The signature did not match this request or Amber account.').waitFor();
+    assert.equal(writes.length,3);
+
+    await send.click();
+    for (const kind of [1,22242]) {
+      await approval.getByRole('link',{name:'Open Amber'}).click();
+      const next = await getHandoff();
+      assert.notEqual(next,handoff);
+      handoff = next;
+      request = new URL(handoff);
+      template = JSON.parse(decodeURIComponent(request.pathname));
+      assert.equal(template.kind,kind);
+      assert.equal(template.pubkey,pubkey);
+      assert.deepEqual(JSON.parse(decodeURIComponent(handoff.slice('nostrsigner:'.length)).split('?')[0]),template);
+      const target = callbackTarget(handoff);
+      assert.equal(target.pathname,'/publish.html');
+      await reply(target,finalizeEvent(template,secret).sig);
+    }
+    await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
+    assert.equal(writes.at(-1).content,'Amber test? & OLED');
+    assert.equal(new URL(page.url()).hash,'');
+  } else {
+    await open('profile.html');
+    assert.equal(await button('Sign in with Amber').count(),0);
+  }
+
+  await open('profile.html');
+  await page.getByText('Change signer',{exact:true}).click();
+  const remote = page.getByRole('region',{name:'Sign-in account'});
   await remote.getByText('Remote signer',{exact:true}).click();
-  await remote.getByText('Use a bunker link',{exact:true}).click();
   await remote.getByLabel('Bunker connection link').fill('bunker://' + broker + '?relay=wss%3A%2F%2Fbroker.fixture.example&secret=fixture-consent');
   await remote.getByRole('button',{name:'Connect bunker link'}).click();
-  await page.locator('main').getByText(/^Signing as/).waitFor();
+  await page.getByText('Signed in with a remote signer').waitFor();
+  await open('publish.html');
+  await page.locator('main').getByText(/^Publishing as/).waitFor();
   resumed = undefined;
   await page.reload();
-  await page.locator('main').getByText(/^Signing as/).waitFor();
+  await page.locator('main').getByText(/^Publishing as/).waitFor();
   assert.equal(resumed,client);
   assert.equal(connections,1);
+  await page.getByLabel('Publication type').selectOption('note');
   await page.getByLabel('Note',{exact:true}).fill('Remote session survived reload');
   await button('Review publication').click();
   await button('Sign and publish').click();
@@ -460,12 +507,18 @@ try {
     buffer:Buffer.from('# A new story\n\nA formatted paragraph.')});
   await page.waitForFunction(() => [...document.querySelectorAll('main label')].find(label => label.firstChild?.textContent === 'Title')?.querySelector('input').value === 'A new story');
   assert.equal(await page.getByLabel('Stable identifier for updates').inputValue(),'a-new-story');
+  await open('profile.html');
+  await button('Sign out').click();
+  await button('Sign in with browser signer').waitFor();
+  await open('index.html');
+  await button('Open profile menu').click();
+  await page.getByRole('dialog').getByRole('link',{name:'Sign in',exact:true}).waitFor();
   assert.deepEqual(uncaught,[]);
   console.log('Mobile Chromium passed profiles, metadata-only discovery, game handoff, music playback, long-form writing, reader swipe and offline resume, Markdown curation, and disposable nsite signing and verification.');
   console.log('Review regressions passed: failed replacement stays blocked, relay readback authenticates, and music navigation survives a refresh.');
   console.log('Nsite lifecycle passed npub lookup, Markdown autofill, owned multi-file creation, same-address update and restore.');
   console.log('The authorized remote signer session survived reload and signed as the same account.');
-  console.log('Direct Amber flow passed with a disposable proxy signer: launch URL, clipboard input, cancellation, signature binding and signed relay authentication.');
+  if (packaged) console.log('Packaged Amber callback passed profile-first sign-in, sign-in persistence, stale callback rejection, cancellation, exact signature verification, and relay authentication with no clipboard fields.');
 } catch (error) {
   console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
   throw error;

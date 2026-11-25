@@ -4,7 +4,7 @@ This Android-first web app brings independent sites, games, music and writing in
 
 ## Experience
 
-- Home and one profile menu link the app's pages. The account picker supports saved public profiles and a separate, explicit signer connection.
+- Home and one profile menu link the app's pages. The profile menu opens sign-in and account management. Public profiles can also be saved for browsing.
 - Discover accepts a publisher’s npub and opens selected sites at their published address. It reads bounded signed event metadata. It groups an addressable site by publisher and identifier, with search, saved items and publisher hiding. Opening a published site is an explicit navigation.
 - Arcade opens games at their published destinations. Music has a real audio player. The bookshelf opens long-form writing, bundled Loopy Library books and imported Markdown.
 - The reader has a chapter drawer, a full-screen reading mode, vertical scroll, horizontal chapter swipe, text settings and persistent bookmarks/position. Library curation supports collections and local metadata.
@@ -13,7 +13,7 @@ This Android-first web app brings independent sites, games, music and writing in
 
 ## Publishing nsites
 
-Connect the account you intend to use. The app remembers the Amber account on this device, restores approved remote sessions while the signer permits them, and checks the signing account and exact event before publishing. Direct Amber opens with the Android signer link and returns the result through the clipboard. Remote sessions retain an application delegation key wrapped by a non-extractable key in browser storage. The signer holds your Nostr private key. Disconnect clears the saved session on this device.
+Use the profile menu to sign in with the account you intend to use. The app remembers the Amber account on this device, restores approved remote sessions while the signer permits them, and verifies the signing account and exact event. In the Android export, Amber sends approval back to the open screen through WebToApp’s app-return link. Remote sessions retain an application delegation key wrapped by a non-extractable key in browser storage. The signer holds your Nostr private key. Disconnect clears the saved session on this device.
 
 **Create new nsite** accepts a static folder, ZIP, HTML file, Markdown, or text. It suggests a title and identifier and reads a description from HTML metadata. Markdown and text become a static page. Choose a named address or your account’s root address. The app blocks creation when it finds a publication at the same address on the checked relays.
 

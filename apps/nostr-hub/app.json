@@ -2,7 +2,7 @@
   "schemaVersion": "0.1",
   "id": "nostr-hub",
   "name": "Pretend Internet",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "status": "testing",
   "summary": "Browse sites, play games and music, read books and publish to Nostr.",
   "entry": "index.html",

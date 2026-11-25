@@ -1,61 +1,17 @@
 import { button, el, heading, label, link, modal, muted, query, route, run, setStatus, status } from '../lib/dom.js';
-import { bootstrap, endpoints, npub, parseKey, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
-import { amberAccountURI, amberSigner, extensionSigner, forgetRemoteSession, pairing, pasteBunker, restoreRemoteSession } from '../lib/signer.js';
+import { bootstrap, endpoints, npub, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
+import { publishingAccount, publishingSigner } from '../lib/account-session.js';
 import { execute, jobId, mediaFile, verifyReview } from '../lib/publisher.js';
-import { all, get, put, saveAccount, setting, setSetting } from '../lib/store.js';
-import { siteURL, validPubkey } from '../lib/model.js';
+import { all, get, put, setting, setSetting } from '../lib/store.js';
+import { siteURL } from '../lib/model.js';
 import { siteIntake } from '../lib/site-intake.js';
 import { siteEditor } from './site-editor.js';
 
 const typeNames = { note: 'Note', article: 'Article', track: 'Music release', nsite: 'Nsite' };
 const defaultBlossom = 'https://blossom.primal.net';
 const fileIds = { nsite: 'site-input', track: 'track-input' };
-const signerKey = 'publishing-account';
 const selectionKey = scope => 'staged-selection:' + scope;
 const replacementRequired = 'Choose valid replacement files before publishing.';
-
-function requestAmberSignature(uri, signal, verify) {
-  return new Promise((resolve, reject) => {
-    const field = el('textarea', { required: true, autocomplete: 'off', spellcheck: 'false', rows: 3 });
-    const message = status();
-    const form = el('form', {}, label('Amber signature', field), el('button', { class: 'primary' }, 'Use signature'), message);
-    const paste = button('Paste Amber signature', async () => {
-      try {
-        field.value = await navigator.clipboard.readText();
-        finish(null, verify(field.value));
-      } catch (error) {
-        setStatus(message, error.name === 'NotAllowedError' ? 'Paste the signature into the field below.' : error.message);
-      }
-    });
-    paste.hidden = !navigator.clipboard?.readText;
-    const dialog = modal('Sign in Amber', 'sheet',
-      el('p', {}, 'Approve in Amber, return here, and paste the signature it copied.'),
-      el('div', { class: 'row' }, link('Open Amber', uri, 'button secondary'), paste), form);
-    const expire = setTimeout(() => finish(new Error('The Amber request expired. Try signing again.')), 120000);
-    const cancel = () => finish(new Error('The Amber request was cancelled.'));
-    let settled = false;
-    function finish(error, event) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(expire);
-      signal.removeEventListener('abort', cancel);
-      dialog.removeEventListener('close', cancel);
-      field.value = '';
-      dialog.close();
-      dialog.remove();
-      if (error) reject(error);
-      else resolve(event);
-    }
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      try { finish(null, verify(field.value)); }
-      catch (error) { setStatus(message, error.message); }
-    });
-    signal.addEventListener('abort', cancel, { once: true });
-    dialog.addEventListener('close', cancel, { once: true });
-    dialog.showModal();
-  });
-}
 
 function receiptPanel(job) {
   const results = { verified: 'Verified by relay readback', 'partially-verified': 'Verified on some relays', 'accepted-unverified': 'Accepted without independent readback',
@@ -79,123 +35,8 @@ function receiptPanel(job) {
 
 export async function render(main) {
   const notice = status();
-  const signerLine = muted('No signer connected');
-  const interrupted = sessionStorage.getItem('pretend-internet:pairing') === 'waiting';
-  sessionStorage.removeItem('pretend-internet:pairing');
-  const pairingStatus = status(interrupted ? 'The previous pairing was interrupted. Start a new connection.' : '');
-  const transportRelay = el('input', { value: 'wss://relay.nsecbunker.com', 'aria-label': 'Signer transport relay', spellcheck: 'false' });
-  const uriBox = el('textarea', { readOnly: true, hidden: true, 'aria-label': 'Copyable connection link', rows: 3 });
-  const bunkerInput = el('input', { type: 'password', placeholder: 'bunker://…', autocomplete: 'off', spellcheck: 'false' });
   let signer;
-  let attempt;
-  const connect = el('button', { type: 'button' }, 'Copy connection');
-  connect.addEventListener('click', run(connect, pairingStatus, async () => {
-    attempt = pairing(transportRelay.value.trim());
-    sessionStorage.setItem('pretend-internet:pairing', 'waiting');
-    uriBox.value = attempt.uri;
-    uriBox.hidden = false;
-    cancelPair.hidden = false;
-    const pending = attempt.connected;
-    pending.catch(() => {});
-    try {
-      try {
-        await navigator.clipboard.writeText(attempt.uri);
-        setStatus(pairingStatus, 'Copied. Paste in your signer, approve, then return here.');
-      } catch {
-        uriBox.focus();
-        uriBox.select();
-        setStatus(pairingStatus, 'Copy the selected link, paste it into your signer, then return.');
-      }
-      await useSigner(await pending);
-    } finally {
-      attempt = null;
-      sessionStorage.removeItem('pretend-internet:pairing');
-      uriBox.value = '';
-      uriBox.hidden = true;
-      cancelPair.hidden = true;
-    }
-  }));
-  const cancelPair = button('Cancel pairing', () => attempt?.cancel());
-  cancelPair.hidden = true;
-  const useBrowser = el('button', { type: 'button' }, 'Use browser signer');
-  useBrowser.addEventListener('click', run(useBrowser, pairingStatus, async () => { await useSigner(await extensionSigner(), 'browser'); }));
-  const amberKey = el('input', { placeholder: 'npub1…', autocomplete: 'off', spellcheck: 'false' });
-  const openAmber = link('Open Amber', amberAccountURI(), 'button primary');
-  openAmber.addEventListener('click', () => setStatus(pairingStatus,
-    'Approve the public-key request in Amber, then return and paste the public key.'));
-  const useAmber = el('button', { type: 'button' }, 'Use Amber public key');
-  async function selectAmber() {
-    const pubkey = parseKey(amberKey.value);
-    amberKey.value = '';
-    await useSigner(amberSigner(pubkey, requestAmberSignature), 'amber');
-  }
-  useAmber.addEventListener('click', run(useAmber, pairingStatus, selectAmber));
-  const pasteAmber = el('button', { type: 'button', hidden: !navigator.clipboard?.readText }, 'Paste Amber public key');
-  pasteAmber.addEventListener('click', run(pasteAmber, pairingStatus, async () => {
-    try { amberKey.value = await navigator.clipboard.readText(); }
-    catch { throw new Error('Paste the public key into the field below.'); }
-    await selectAmber();
-  }));
-  const useLink = el('button', { type: 'button' }, 'Connect bunker link');
-  useLink.addEventListener('click', run(useLink, pairingStatus, async () => {
-    const value = bunkerInput.value.trim();
-    bunkerInput.value = '';
-    await useSigner(await pasteBunker(value));
-  }));
-  const connection = modal('Connect a signer', 'sheet', signerLine,
-    el('section', { class: 'stack-tight' }, el('div', { class: 'row' }, openAmber, pasteAmber), label('Amber public key', amberKey), useAmber),
-    useBrowser,
-    el('details', { class: 'stack-tight' }, el('summary', {}, 'Remote signer'),
-      label('Signer transport relay', transportRelay),
-      connect, uriBox, cancelPair, el('details', {}, el('summary', {}, 'Use a bunker link'), label('Bunker connection link', bunkerInput), useLink)),
-    pairingStatus);
-  const connectUI = button('Connect signer', () => connection.showModal(), 'secondary');
-  const disconnect = button('Disconnect signer', async () => {
-    if (signer) { await signer.close(); signer = null; }
-    setSetting(signerKey, null);
-    try { await forgetRemoteSession(); }
-    catch { setStatus(notice, 'Could not remove the local remote signer session.'); }
-    signerLabel.textContent = 'External signer disconnected.';
-    signerLine.textContent = signerLabel.textContent;
-    disconnect.hidden = true;
-    connectUI.textContent = 'Connect signer';
-    await editor.reset();
-    await applyType();
-  });
-  disconnect.hidden = true;
-  const signerLabel = muted('A signer is required to publish.');
-  function displaySigner() {
-    signerLabel.textContent = signer.mode === 'amber'
-      ? 'Amber account ' + shortKey(signer.pubkey) + ' · approval required for each signature'
-      : 'Signing as ' + shortKey(signer.pubkey);
-    signerLine.textContent = signerLabel.textContent;
-    connectUI.textContent = 'Change signer';
-    disconnect.hidden = false;
-  }
-  async function useSigner(value, mode = 'remote') {
-    const previous = signer?.pubkey;
-    try {
-      if (mode === 'remote') await value.saveSession();
-      else await forgetRemoteSession();
-    } catch {
-      await value.close();
-      throw new Error('This device could not save the signer session.');
-    }
-    if (signer) await signer.close();
-    signer = value;
-    setSetting(signerKey, { pubkey: signer.pubkey, mode });
-    saveAccount(signer.pubkey, !setting('account'));
-    displaySigner();
-    connection.close();
-    setStatus(pairingStatus, '');
-    if (previous !== signer.pubkey) {
-      await editor.reset();
-      await applyType();
-    }
-    try { await refreshIdentity(signer.pubkey); } catch { /* Cached destinations remain available. */ }
-    await setDestinations();
-  }
-
+  const signerLabel = el('p', { class: 'muted' }, link('Sign in to publish', route('profile', { signin: '1', return: 'publish', site: query.get('site') })));
   const type = el('select', {}, Object.entries(typeNames).map(([id, name]) => el('option', { value: id }, name)));
   const title = el('input', { maxlength: 140 });
   const identifier = el('input', { maxlength: 70, spellcheck: 'false' });
@@ -353,7 +194,7 @@ export async function render(main) {
   type.value = query.has('site') ? 'nsite' : setting('draft-type', 'note');
   if (!type.value) type.value = 'note';
   type.addEventListener('change', () => { setSetting('draft-type', type.value); void applyType(); });
-  form.addEventListener('input', event => { if (event.target !== type && event.target.type !== 'file') saveDraft(); });
+  form.addEventListener('input', event => { if (event.target !== type && event.target.type !== 'file' && !editor.node.contains(event.target)) saveDraft(); });
   form.addEventListener('submit', run(reviewBtn, formMessage, async () => {
     setStatus(notice, '');
     if (updatingFiles) throw new Error('Wait for the selected files to finish staging.');
@@ -362,12 +203,12 @@ export async function render(main) {
     const checkedToken = stagedSelection;
     const stagedKey = selection.type === 'nsite' && editor.restoring() ? '' : selectedKey(selection.type);
     if (fileIds[selection.type] && stagedKey && checkedToken !== setting(stagedKey)) throw new Error(replacementRequired);
-    if (!signer) { connection.showModal(); return; }
+    if (!signer) { signerLabel.querySelector('a').focus(); throw new Error('Sign in from your profile before reviewing this publication.'); }
     const snapshot = ['track', 'nsite'].includes(selection.type) ? files.slice() : [];
     const selectedSigner = signer;
     let prepared;
     if (selection.type === 'nsite') {
-      if (setting(signerKey)?.pubkey !== selectedSigner.pubkey) throw new Error('Confirm your publishing account again.');
+      if (publishingAccount()?.pubkey !== selectedSigner.pubkey) throw new Error('Confirm your publishing account again.');
       setStatus(formMessage, 'Checking the signed nsite address and version.');
       prepared = await editor.prepare(selection, snapshot, selectedSigner.pubkey);
       selection.site = prepared.site;
@@ -395,7 +236,7 @@ export async function render(main) {
       el('ul', {}, selection.relays.map(url => el('li', {}, el('code', {}, url)))), send, progress);
     review.addEventListener('close', () => review.remove(), { once: true });
     send.addEventListener('click', run(send, progress, async () => {
-      if (signer !== selectedSigner || (prepared && setting(signerKey)?.pubkey !== selectedSigner.pubkey)) throw new Error('The signer changed. Reopen the review.');
+      if (signer !== selectedSigner || (prepared && publishingAccount()?.pubkey !== selectedSigner.pubkey)) throw new Error('The signer changed. Reopen the review.');
       if (confirm && !confirm.checked) throw new Error('Confirm the listed removals before signing.');
       if (fileIds[selection.type] && (checkedSelection !== selectionId || (stagedKey && checkedToken !== setting(stagedKey)))) {
         throw new Error('The selected files changed. Reopen the review.');
@@ -431,20 +272,13 @@ export async function render(main) {
     }));
     review.showModal();
   }));
-  main.replaceChildren(heading('Publish', connectUI), signerLabel, disconnect, notice, form, receipts, link('Network settings', route('network')));
-  const saved = setting(signerKey);
-  if (validPubkey(saved?.pubkey)) {
-    if (saved.mode === 'amber') signer = amberSigner(saved.pubkey, requestAmberSignature);
-    if (['browser', 'remote'].includes(saved.mode)) {
-      try {
-        const restored = saved.mode === 'remote' ? await restoreRemoteSession(saved.pubkey) : await extensionSigner();
-        if (restored.pubkey !== saved.pubkey) throw new Error('The browser signer changed accounts.');
-        signer = restored;
-      } catch (error) { setStatus(notice, error.message + ' Reconnect your intended account.'); }
-    }
-    if (signer) displaySigner();
-  }
+  main.replaceChildren(heading('Publish'), signerLabel, notice, form, receipts, link('Network settings', route('network')));
+  try {
+    signer = await publishingSigner();
+    if (signer) signerLabel.replaceChildren('Publishing as ', link(shortKey(signer.pubkey), route('profile')));
+  } catch (error) { setStatus(notice, error.message + ' Reconnect from your profile.'); }
   await editor.reset();
   await applyType();
+  if (signer) void refreshIdentity(signer.pubkey).then(() => setDestinations()).catch(() => {});
   await showReceipts();
 }

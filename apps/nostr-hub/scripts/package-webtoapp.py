@@ -41,6 +41,13 @@ def main():
     if icon[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" or unpack(">II", icon[16:24]) != (512, 512):
         parser.error("The launcher icon must be a 512 × 512 PNG.")
     prefs = json.loads((APP / "webtoapp/common.json").read_text())
+    scheme = prefs["customAppReturnSchemes"][0].encode("ascii")
+    marker = b'<meta name="pretend-amber-return" content="' + scheme + b'">'
+    for path, body in files.items():
+        if path.endswith(".html"):
+            if b"</head>" not in body:
+                parser.error("Could not configure Amber return on " + path)
+            files[path] = body.replace(b"</head>", marker + b"\n</head>", 1)
     version = json.loads((APP / "package.json").read_text())["version"]
     digest = hashlib.sha256()
     for path, body in files.items():

@@ -1,5 +1,7 @@
 import { button, el, icon, iconButton, link, modal, route } from './lib/dom.js';
 import { setting } from './lib/store.js';
+import { discardStaleAmberReturn } from './lib/amber-return.js';
+import { publishingAccount } from './lib/account-session.js';
 import { preferences, shortKey } from './lib/nostr.js';
 
 const current = document.body.dataset.page;
@@ -34,7 +36,9 @@ async function shell() {
   }, icon(symbol), title);
   const settings = modal('Settings', 'sheet', el('nav', { class: 'menu' },
     link('Profiles and signer', route('profile')), link('Network and storage', route('network')), link('Help and data', route('help'))));
+  const session = publishingAccount();
   const menu = modal(accountData.name || shortKey(account), 'drawer',
+    link(session ? 'Manage account' : 'Sign in', route('profile', { signin: '1' }), session ? 'button secondary' : 'button primary'),
     el('nav', { class: 'menu', 'aria-label': 'App pages' },
       destinations.map(([page, title, symbol]) => el('a', { href: route(page) }, icon(symbol), title)),
       button([icon('settings'), 'Settings'], () => { menu.close(); settings.showModal(); })));
@@ -53,6 +57,7 @@ async function shell() {
 }
 
 const main = document.querySelector('#main');
+const staleApproval = discardStaleAmberReturn();
 if (current !== 'reader') {
   main.classList.add('main', 'stack');
   try { await shell(); } catch { main.prepend('Local account settings are unavailable.'); }
@@ -60,6 +65,8 @@ if (current !== 'reader') {
 try {
   const loaded = await pages[current]();
   await loaded.render(main, current);
+  if (staleApproval) main.prepend(el('p', { role: 'status', class: 'notice' },
+    'The app restarted while Amber was open. Start the approval again.'));
 } catch (error) {
   main.replaceChildren(el('p', { role: 'alert' }, 'Could not open this page. ' + error.message), link('Home', route('index')));
 }
