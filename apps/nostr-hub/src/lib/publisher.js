@@ -167,8 +167,7 @@ export async function execute({ draft, files, signer, transport, previous, check
   const outcomes = await Promise.all(draft.relays.map(async url => {
     try {
       const entry = await transport.publish(url, job.event, { authPubkey: signer.pubkey, signAuth: value => signer.sign(value) });
-      const { events } = await transport.query(url, { ids: [job.event.id] }, 1).catch(() => ({ events: [] }));
-      return { url, accepted: entry.accepted, verified: events.some(event => event.id === job.event.id), code: entry.code };
+      return { url, accepted: entry.accepted, verified: entry.verified === true, code: entry.code };
     } catch (error) { return { url, accepted: false, verified: false, code: error.code || 'unavailable' }; }
   }));
   job.attempts = outcomes;

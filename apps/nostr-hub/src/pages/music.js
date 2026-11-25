@@ -41,7 +41,8 @@ export async function render(main) {
     player.play().catch(() => setStatus(notice, 'Playback could not start. Try the play control or another track.'));
   }
   function advance(step) {
-    const index = queue.indexOf(current);
+    const address = current && key(current);
+    const index = queue.findIndex(track => key(track) === address);
     const next = queue[index + step];
     if (next) open(next);
   }

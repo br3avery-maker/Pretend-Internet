@@ -7,6 +7,8 @@ import { all, get, put, setting, setSetting } from '../lib/store.js';
 const typeNames = { note: 'Note', article: 'Article', track: 'Music release', nsite: 'Nsite' };
 const defaultBlossom = 'https://blossom.primal.net';
 const fileIds = { nsite: 'site-input', track: 'track-input' };
+const selectionKey = kind => 'staged-selection:' + kind;
+const replacementRequired = 'Choose valid replacement files before publishing.';
 
 function receiptPanel(job) {
   const results = { verified: 'Verified by relay readback', 'partially-verified': 'Verified on some relays', 'accepted-unverified': 'Accepted without independent readback',
@@ -126,6 +128,7 @@ export async function render(main) {
   const receipts = el('section', { class: 'stack-tight' });
   const reviewBtn = el('button', { class: 'primary' }, 'Review publication');
   let files = [];
+  let stagedSelection = null;
   let updatingFiles = false;
   let selectionId = 0;
 
@@ -153,7 +156,9 @@ export async function render(main) {
     const value = type.value;
     const saved = drafts[value] || {};
     const next = ++selectionId;
-    updatingFiles = false;
+    files = [];
+    stagedSelection = null;
+    updatingFiles = Boolean(fileIds[value]);
     const labels = { note: 'Note', article: 'Markdown article', track: 'Lyrics or description', nsite: 'Site description' };
     titleField.hidden = value === 'note';
     identifierField.hidden = value === 'note';
@@ -167,23 +172,44 @@ export async function render(main) {
     text.value = saved.body || '';
     artist.value = saved.artist || '';
     for (const input of [siteInput, folderInput, audioInput, coverInput]) input.value = '';
-    const record = fileIds[value] ? await get('files', fileIds[value]) : null;
+    let record;
+    let storageError;
+    try {
+      if (fileIds[value]) record = await get('files', fileIds[value]);
+    } catch (error) { storageError = error; }
     if (selectionId !== next) return;
-    files = record?.files || [];
-    setStatus(fileMessage, files.length ? `${files.length} staged files: ${files.slice(0, 4).map(file => file.path).join(', ')}.` : '');
+    updatingFiles = false;
+    const expected = setting(selectionKey(value));
+    if (!storageError && (record?.selection ?? null) === expected) {
+      files = record?.files || [];
+      stagedSelection = expected;
+    }
+    setStatus(fileMessage, storageError?.message || (expected && !files.length ? replacementRequired : fileSummary()));
     setStatus(formMessage, '');
     await setDestinations();
   }
+  function fileSummary() {
+    return files.length ? `${files.length} staged files: ${files.slice(0, 4).map(file => file.path).join(', ')}.` : '';
+  }
   async function stage(kind, action) {
     const current = ++selectionId;
+    const key = selectionKey(kind);
+    const previous = stagedSelection === setting(key) ? files : [];
+    const token = crypto.randomUUID();
+    files = [];
+    stagedSelection = null;
     updatingFiles = true;
     setStatus(fileMessage, 'Checking selected files.');
     try {
-      const prepared = await action();
-      if (selectionId !== current || type.value !== kind) return;
-      await put('files', { id: fileIds[kind], files: prepared });
+      // Invalidate the saved selection before validation or the asynchronous write.
+      setSetting(key, token);
+      const prepared = await action(previous);
+      if (selectionId !== current || setting(key) !== token) return;
+      await put('files', { id: fileIds[kind], selection: token, files: prepared });
+      if (selectionId !== current || setting(key) !== token) return;
       files = prepared;
-      setStatus(fileMessage, `${files.length} staged files: ${files.slice(0, 4).map(file => file.path).join(', ')}.`);
+      stagedSelection = token;
+      setStatus(fileMessage, fileSummary());
     } catch (error) { if (selectionId === current) setStatus(fileMessage, error.message); }
     finally { if (selectionId === current) updatingFiles = false; }
   }
@@ -192,10 +218,12 @@ export async function render(main) {
     if (chosen.length) stage('nsite', () => siteFiles(chosen));
   });
   for (const input of [audioInput, coverInput]) input.addEventListener('change', () => {
-    stage('track', async () => {
-      const audio = audioInput.files[0] ? await mediaFile(audioInput.files[0], 'audio/') : files[0];
+    const audioFile = audioInput.files[0];
+    const coverFile = coverInput.files[0];
+    stage('track', async previous => {
+      const audio = audioFile ? await mediaFile(audioFile, 'audio/') : previous[0];
       if (!audio) throw new Error('Choose the audio file first.');
-      const image = coverInput.files[0] ? await mediaFile(coverInput.files[0], 'image/') : files[1];
+      const image = coverFile ? await mediaFile(coverFile, 'image/') : previous[1];
       return image ? [audio, image] : [audio];
     });
   });
@@ -212,8 +240,11 @@ export async function render(main) {
   form.addEventListener('input', event => { if (event.target !== type && event.target.type !== 'file') saveDraft(); });
   form.addEventListener('submit', run(reviewBtn, formMessage, async () => {
     if (updatingFiles) throw new Error('Wait for the selected files to finish staging.');
-    if (!signer) { connection.showModal(); return; }
     const selection = collect();
+    const checkedSelection = selectionId;
+    const checkedToken = stagedSelection;
+    if (fileIds[selection.type] && checkedToken !== setting(selectionKey(selection.type))) throw new Error(replacementRequired);
+    if (!signer) { connection.showModal(); return; }
     const snapshot = ['track', 'nsite'].includes(selection.type) ? files.slice() : [];
     const selectedSigner = signer;
     verifyReview(selection, snapshot);
@@ -230,6 +261,9 @@ export async function render(main) {
     review.addEventListener('close', () => review.remove(), { once: true });
     send.addEventListener('click', run(send, progress, async () => {
       if (signer !== selectedSigner) throw new Error('The signer changed. Reopen the review.');
+      if (fileIds[selection.type] && (checkedSelection !== selectionId || checkedToken !== setting(selectionKey(selection.type)))) {
+        throw new Error('The selected files changed. Reopen the review.');
+      }
       review.dataset.busy = 'true';
       review.querySelector('button').disabled = true;
       const lockClose = event => event.preventDefault();

@@ -38,17 +38,15 @@ test('reuses the identical reviewed event and uploads on retry, and checks indep
   const secret = generateSecretKey();
   let signs = 0;
   let uploads = 0;
-  let cached;
   let available = false;
   const signer = { pubkey: getPublicKey(secret), sign: async value => { signs++; return finalizeEvent(value, secret); } };
   const draft = { type: 'nsite', title: 'Test', slug: 'test', body: '', server: 'https://blossom.fixture.example', relays: ['wss://relay.fixture.example'] };
   const files = await siteFiles([new File(['<h1>Test</h1>'], 'index.html')]);
   const options = {
-    draft, files, signer, checkpoint: async value => { cached = structuredClone(value); },
+    draft, files, signer, checkpoint: async () => {},
     upload: async () => { uploads++; return 'https://blossom.fixture.example/file'; },
     transport: {
-      async publish() { return { accepted: true, verified: true, code: 'accepted' }; },
-      async query() { return { events: available ? [cached.event] : [] }; },
+      async publish() { return { accepted: true, verified: available, code: 'accepted' }; },
     },
   };
   const initial = await execute(options);

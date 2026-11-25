@@ -40,24 +40,41 @@ const events = [
   sign(35128, '', [['d','test-arcade'],['title','Test arcade'],['description','A game in the arcade'],['path','/index.html','d'.repeat(64)]]),
   sign(30023, '# Example article\n\nThis article came from a signed event.', [['d','article'],['title','Example article']]),
   sign(36787, '', [['d','track'],['title','Fixture song'],['artist','Fixture artist'],['url','https://media.fixture.example/fixture.wav']]),
-  sign(34139, '', [['d','library'],['title','Fixture playlist'],['a',`36787:${pubkey}:track`]]),
+  sign(36787, '', [['d','second'],['title','Second fixture song'],['url','https://media.fixture.example/fixture.wav']]),
+  sign(36787, '', [['d','third'],['title','Third fixture song'],['url','https://media.fixture.example/fixture.wav']]),
+  sign(34139, '', [['d','library'],['title','Fixture playlist'], ...['track','second','third'].map(id => ['a',`36787:${pubkey}:${id}`])]),
   sign(0, JSON.stringify({ display_name:'Tampered' }), [], another),
 ];
 events.at(-1).content = '{"display_name":"Bad signature"}';
 const writes = [];
 let uploads = 0;
+let authentications = 0;
 let remoteSiteRequests = 0;
 const uncaught = [];
 const context = await browser.newContext({
   viewport: { width:393,height:852 }, isMobile: true, hasTouch: true,
 });
 await context.routeWebSocket(/^wss:\/\//, connection => {
+  let authenticated = false;
   connection.onMessage(data => {
     const [verb,id,filter] = JSON.parse(data);
     if (verb === 'REQ') {
+      if (filter.ids && !authenticated) {
+        connection.send(JSON.stringify(['AUTH','fixture-read-challenge']));
+        connection.send(JSON.stringify(['CLOSED',id,'auth-required: authenticate to read this event']));
+        return;
+      }
       for (const event of events.filter(event => matchFilter(filter,event)).slice(0,filter.limit ?? 100))
         connection.send(JSON.stringify(['EVENT',id,event]));
       connection.send(JSON.stringify(['EOSE',id]));
+    } else if (verb === 'AUTH') {
+      assert.equal(verifyEvent(id),true);
+      assert.equal(id.kind,22242);
+      assert.equal(id.pubkey,pubkey);
+      assert.ok(id.tags.some(parts => parts[0] === 'challenge' && parts[1] === 'fixture-read-challenge'));
+      authenticated = true;
+      authentications++;
+      connection.send(JSON.stringify(['OK',id.id,true,'']));
     } else if (verb === 'EVENT') {
       assert.equal(verifyEvent(id),true);
       writes.push(id);
@@ -102,6 +119,11 @@ await context.exposeBinding('fixtureGetKey', () => pubkey);
 await context.exposeBinding('fixtureSign', (_source, template) => finalizeEvent(template, secret));
 await context.addInitScript(() => {
   window.nostr = { getPublicKey:() => window.fixtureGetKey(), signEvent:template => window.fixtureSign(template) };
+  const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function(...args) {
+    if (this.name === 'files' && window.failStagedWrite) throw new Error('Fixture storage failure');
+    return put.apply(this,args);
+  };
 });
 const page = await context.newPage();
 page.on('pageerror', error => uncaught.push(error.message));
@@ -166,10 +188,23 @@ try {
 
   await open('music.html');
   await button('Refresh music').click();
-  await page.getByRole('heading',{name:'Fixture song'}).waitFor();
+  await page.getByRole('heading',{name:'Fixture song',exact:true}).waitFor();
   await page.getByLabel('Playlist').selectOption({label:'Fixture playlist'});
-  await button('Play').click();
+  await page.getByRole('region',{name:'Tracks'}).locator('article').filter({hasText:'Second fixture song'}).getByRole('button',{name:'Play'}).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentTime > 0);
+  const playing = name => page.getByRole('heading',{level:2,name,exact:true});
+  await button('Refresh music').click();
+  await page.getByText('3 tracks and 1 playlists available.').waitFor();
+  await button('Next track').click();
+  await playing('Third fixture song').waitFor();
+  await button('Refresh music').click();
+  await page.getByText('3 tracks and 1 playlists available.').waitFor();
+  await button('Previous track').click();
+  await playing('Second fixture song').waitFor();
+  await button('Refresh music').click();
+  await page.getByText('3 tracks and 1 playlists available.').waitFor();
+  await page.locator('audio').dispatchEvent('ended');
+  await playing('Third fixture song').waitFor();
   await snap('music');
 
   await open('writing.html');
@@ -225,7 +260,39 @@ try {
   await page.getByLabel('Publication type').selectOption('nsite');
   await page.getByLabel('Title',{exact:true}).fill('Disposable browser fixture');
   await page.getByLabel('Stable identifier for updates').fill('test-site');
-  await page.getByLabel('HTML or ZIP').setInputFiles({name:'fixture.html',mimeType:'text/html',buffer:Buffer.from('<h1>Fixture</h1>')});
+  const siteFile = page.getByLabel('HTML or ZIP');
+  const replacementRequired = 'Choose valid replacement files before publishing.';
+  const review = page.getByRole('dialog',{name:'Review public publication'});
+  const oldSite = Buffer.from('<h1>Old selection</h1>');
+  const newSite = Buffer.from('<h1>New selection</h1>');
+  const chooseHTML = content => siteFile.setInputFiles({name:'fixture.html',mimeType:'text/html',buffer:content});
+  await chooseHTML(oldSite);
+  await page.getByText(/1 staged files/).waitFor();
+  await chooseHTML(Buffer.alloc(0));
+  await page.getByText('The folder or ZIP needs a nonempty index.html entry.').waitFor();
+  await button('Review publication').click();
+  await page.getByText(replacementRequired).waitFor();
+  assert.equal(await review.count(),0);
+  await chooseHTML(oldSite);
+  await page.getByText(/1 staged files/).waitFor();
+  await page.evaluate(() => { window.failStagedWrite = true; });
+  await chooseHTML(newSite);
+  await page.getByText('Fixture storage failure').waitFor();
+  await button('Review publication').click();
+  await page.getByText(replacementRequired).waitFor();
+  assert.equal(await review.count(),0);
+  await page.getByLabel('Publication type').selectOption('note');
+  await page.getByLabel('Publication type').selectOption('nsite');
+  await page.getByText(replacementRequired).waitFor();
+  assert.equal(await page.getByText(/1 staged files/).count(),0);
+  await page.reload();
+  await page.getByText(replacementRequired).waitFor();
+  await button('Connect signer').click();
+  await button('Use browser signer').click();
+  await page.getByText(/^Signing as/).filter({visible:true}).waitFor();
+  await button('Review publication').click();
+  assert.equal(await review.count(),0);
+  await chooseHTML(newSite);
   await page.getByText(/1 staged files/).waitFor();
   await page.getByLabel('Blossom server').selectOption('https://blossom.fixture.example');
   await button('Review publication').click();
@@ -238,12 +305,15 @@ try {
   assert.equal(writes.length,1);
   assert.equal(writes[0].kind,35128);
   assert.equal(uploads,1);
+  assert.equal(authentications,1);
+  assert.deepEqual([...blobMap.values()],[newSite]);
   await page.getByText(/Verified by relay readback/).waitFor();
   await page.reload();
   await page.getByText(/Verified by relay readback/).waitFor();
 
   assert.deepEqual(uncaught,[]);
   console.log('Mobile Chromium passed profiles, metadata-only discovery, game handoff, music playback, long-form writing, reader swipe and offline resume, Markdown curation, and disposable nsite signing and verification.');
+  console.log('Review regressions passed: failed replacement stays blocked, relay readback authenticates, and music navigation survives a refresh.');
 } catch (error) {
   console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
   throw error;
