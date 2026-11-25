@@ -1,5 +1,5 @@
 import { BunkerSigner, createNostrConnectURI, parseBunkerInput } from 'nostr-tools/nip46';
-import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { generateSecretKey, getEventHash, getPublicKey } from 'nostr-tools/pure';
 import { checkSignature, endpoints } from './nostr.js';
 import { validPubkey } from './model.js';
 
@@ -25,6 +25,49 @@ export function extensionSigner() {
   if (!globalThis.nostr?.getPublicKey || !globalThis.nostr?.signEvent) throw new Error('This browser has no Nostr extension. Use Connect to Amber or another remote signer.');
   return identify(globalThis.nostr);
 }
+
+// Adapted from the direct Android handoff in MojiSurvivor's Nostr engine.
+function androidSignerURI(type, event) {
+  const query = new URLSearchParams({ type, appName: 'Pretend Internet',
+    compressionType: 'none', returnType: 'signature', id: crypto.randomUUID() });
+  if (event) query.set('current_user', event.pubkey);
+  // Amber decodes before splitting on the URI's query delimiter.
+  const payload = event ? encodeURIComponent(JSON.stringify(event).replaceAll('?', '\\u003f')) : '';
+  return `nostrsigner:${payload}?${query}`;
+}
+
+export const amberAccountURI = () => androidSignerURI('get_public_key');
+
+export function amberSigner(pubkey, request) {
+  const session = new AbortController();
+  let pending = Promise.resolve();
+  return {
+    pubkey,
+    mode: 'amber',
+    async close() { session.abort(); },
+    sign(template) {
+      const unsigned = { ...structuredClone(template), pubkey };
+      // Upload authorizations and multiple relay challenges can overlap.
+      const signing = pending.then(() => {
+        if (session.signal.aborted) throw new Error('Amber account disconnected.');
+        return request(androidSignerURI('sign_event', unsigned), session.signal, raw => {
+          const value = raw.trim();
+          let event;
+          if (/^[0-9a-f]{128}$/.test(value)) {
+            event = { ...unsigned, id: getEventHash(unsigned), sig: value };
+          } else {
+            try { event = JSON.parse(value); }
+            catch { throw new Error('Paste the signature copied by Amber.'); }
+          }
+          try { return checkSignature(unsigned, event, pubkey); }
+          catch { throw new Error('The signature did not match this request or Amber account.'); }
+        });
+      });
+      pending = signing.catch(() => {});
+      return signing;
+    },
+  };
+}
 export function pairing(relay) {
   const allowed = endpoints([relay]);
   if (allowed.length !== 1) throw new Error('Enter a public wss:// signer relay.');
@@ -48,6 +91,12 @@ export async function pasteBunker(uri) {
   const provider = BunkerSigner.fromBunker(secretKey, pointer);
   const close = async () => { try { await provider.close(); } finally { secretKey.fill(0); } };
   try { await withTimeout(provider.connect(), 90000, 'The signer did not approve the connection in time.'); }
-  catch (error) { await close(); throw error; }
+  catch (error) {
+    await close();
+    if (/subscription closed/i.test(String(error?.message ?? error))) {
+      throw new Error('The bunker relay closed before Amber could answer. Try Open Amber for on-device signing.');
+    }
+    throw error;
+  }
   return identify(provider, close);
 }

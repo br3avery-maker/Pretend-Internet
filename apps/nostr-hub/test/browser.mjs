@@ -119,6 +119,12 @@ await context.exposeBinding('fixtureGetKey', () => pubkey);
 await context.exposeBinding('fixtureSign', (_source, template) => finalizeEvent(template, secret));
 await context.addInitScript(() => {
   window.nostr = { getPublicKey:() => window.fixtureGetKey(), signEvent:template => window.fixtureSign(template) };
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href^="nostrsigner:"]');
+    if (!link) return;
+    event.preventDefault();
+    window.lastAmberURI = link.getAttribute('href');
+  });
   const put = IDBObjectStore.prototype.put;
   IDBObjectStore.prototype.put = function(...args) {
     if (this.name === 'files' && window.failStagedWrite) throw new Error('Fixture storage failure');
@@ -311,9 +317,53 @@ try {
   await page.reload();
   await page.getByText(/Verified by relay readback/).waitFor();
 
+  await page.getByLabel('Publication type').selectOption('note');
+  await page.getByLabel('Note',{exact:true}).fill('Amber test? & OLED');
+  await button('Connect signer').click();
+  await link('Open Amber').click();
+  let handoff = await page.evaluate(() => window.lastAmberURI);
+  assert.equal(new URL(handoff).searchParams.get('type'),'get_public_key');
+  assert.equal(new URL(handoff).searchParams.has('callbackUrl'),false);
+  await page.getByLabel('Amber public key').fill(npubEncode(pubkey));
+  await button('Use Amber public key').click();
+  await page.locator("main").getByText(/approval required for each signature/).waitFor();
+  await button('Review publication').click();
+  const approval = page.getByRole('dialog',{name:'Sign in Amber'});
+  const signAndPublish = review.getByRole('button',{name:'Sign and publish'});
+  await signAndPublish.click();
+  await approval.waitFor();
+  await approval.getByRole('button',{name:'Close'}).click();
+  await review.getByText('The Amber request was cancelled.').waitFor();
+  assert.equal(writes.length,1);
+  await signAndPublish.click();
+  for (const kind of [1,22242]) {
+    await approval.getByRole('link',{name:'Open Amber'}).click();
+    const next = await page.evaluate(() => window.lastAmberURI);
+    assert.notEqual(next,handoff);
+    handoff = next;
+    const request = new URL(handoff);
+    assert.equal(request.searchParams.get('type'),'sign_event');
+    const template = JSON.parse(decodeURIComponent(request.pathname));
+    assert.deepEqual(JSON.parse(decodeURIComponent(handoff.slice('nostrsigner:'.length)).split('?')[0]),template);
+    assert.equal(template.kind,kind);
+    assert.equal(template.pubkey,pubkey);
+    if (kind === 1) {
+      await approval.getByLabel('Amber signature').fill(finalizeEvent({...template,content:'Wrong content'},secret).sig);
+      await approval.getByRole('button',{name:'Use signature'}).click();
+      await approval.getByText('The signature did not match this request or Amber account.').waitFor();
+      assert.equal(writes.length,1);
+    }
+    await approval.getByLabel('Amber signature').fill(finalizeEvent(template,secret).sig);
+    await approval.getByRole('button',{name:'Use signature'}).click();
+  }
+  await page.getByText('The signed event was independently read back from every selected relay.').waitFor();
+  assert.equal(writes.length,2);
+  assert.equal(writes.at(-1).content,'Amber test? & OLED');
+
   assert.deepEqual(uncaught,[]);
   console.log('Mobile Chromium passed profiles, metadata-only discovery, game handoff, music playback, long-form writing, reader swipe and offline resume, Markdown curation, and disposable nsite signing and verification.');
   console.log('Review regressions passed: failed replacement stays blocked, relay readback authenticates, and music navigation survives a refresh.');
+  console.log('Direct Amber flow passed with a disposable proxy signer: launch URL, clipboard input, cancellation, signature binding and signed relay authentication.');
 } catch (error) {
   console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
   throw error;

@@ -1,6 +1,6 @@
 import { button, el, heading, label, link, modal, muted, route, run, setStatus, status } from '../lib/dom.js';
-import { bootstrap, endpoints, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
-import { extensionSigner, pairing, pasteBunker } from '../lib/signer.js';
+import { bootstrap, endpoints, parseKey, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
+import { amberAccountURI, amberSigner, extensionSigner, pairing, pasteBunker } from '../lib/signer.js';
 import { execute, jobId, mediaFile, siteFiles, verifyReview } from '../lib/publisher.js';
 import { all, get, put, setting, setSetting } from '../lib/store.js';
 
@@ -9,6 +9,37 @@ const defaultBlossom = 'https://blossom.primal.net';
 const fileIds = { nsite: 'site-input', track: 'track-input' };
 const selectionKey = kind => 'staged-selection:' + kind;
 const replacementRequired = 'Choose valid replacement files before publishing.';
+
+function requestAmberSignature(uri, signal, verify) {
+  return new Promise((resolve, reject) => {
+    const field = el('textarea', { required: true, autocomplete: 'off', spellcheck: 'false', rows: 3 });
+    const message = status();
+    const form = el('form', {}, label('Amber signature', field), el('button', { class: 'primary' }, 'Use signature'), message);
+    const dialog = modal('Sign in Amber', 'sheet',
+      el('p', {}, 'Approve in Amber, return here, and paste the signature it copied.'),
+      link('Open Amber', uri, 'button secondary'), form);
+    const expire = setTimeout(() => finish(new Error('The Amber request expired. Try signing again.')), 120000);
+    const cancel = () => finish(new Error('The Amber request was cancelled.'));
+    function finish(error, event) {
+      clearTimeout(expire);
+      signal.removeEventListener('abort', cancel);
+      dialog.removeEventListener('close', cancel);
+      field.value = '';
+      dialog.close();
+      dialog.remove();
+      if (error) reject(error);
+      else resolve(event);
+    }
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      try { finish(null, verify(field.value)); }
+      catch (error) { setStatus(message, error.message); }
+    });
+    signal.addEventListener('abort', cancel, { once: true });
+    dialog.addEventListener('close', cancel, { once: true });
+    dialog.showModal();
+  });
+}
 
 function receiptPanel(job) {
   const results = { verified: 'Verified by relay readback', 'partially-verified': 'Verified on some relays', 'accepted-unverified': 'Accepted without independent readback',
@@ -73,14 +104,27 @@ export async function render(main) {
   cancelPair.hidden = true;
   const useBrowser = el('button', { type: 'button' }, 'Use browser signer');
   useBrowser.addEventListener('click', run(useBrowser, pairingStatus, async () => { await useSigner(await extensionSigner()); }));
+  const amberKey = el('input', { placeholder: 'npub1…', autocomplete: 'off', spellcheck: 'false' });
+  const openAmber = link('Open Amber', amberAccountURI(), 'button primary');
+  openAmber.addEventListener('click', () => setStatus(pairingStatus,
+    'Approve the public-key request in Amber, then return and paste the public key.'));
+  const useAmber = el('button', { type: 'button' }, 'Use Amber public key');
+  useAmber.addEventListener('click', run(useAmber, pairingStatus, async () => {
+    const pubkey = parseKey(amberKey.value);
+    amberKey.value = '';
+    await useSigner(amberSigner(pubkey, requestAmberSignature));
+  }));
   const useLink = el('button', { type: 'button' }, 'Connect bunker link');
   useLink.addEventListener('click', run(useLink, pairingStatus, async () => {
     const value = bunkerInput.value.trim();
     bunkerInput.value = '';
     await useSigner(await pasteBunker(value));
   }));
-  const connection = modal('Connect a signer', 'sheet', signerLine, useBrowser,
-    el('section', { class: 'stack-tight' }, el('h3', {}, 'Amber or remote signer'), label('Signer transport relay', transportRelay),
+  const connection = modal('Connect a signer', 'sheet', signerLine,
+    el('section', { class: 'stack-tight' }, openAmber, label('Amber public key', amberKey), useAmber),
+    useBrowser,
+    el('details', { class: 'stack-tight' }, el('summary', {}, 'Remote signer'),
+      label('Signer transport relay', transportRelay),
       connect, uriBox, cancelPair, el('details', {}, el('summary', {}, 'Use a bunker link'), label('Bunker connection link', bunkerInput), useLink)),
     pairingStatus);
   const connectUI = button('Connect signer', () => connection.showModal(), 'secondary');
@@ -95,7 +139,9 @@ export async function render(main) {
   async function useSigner(value) {
     if (signer) { await signer.close(); }
     signer = value;
-    signerLabel.textContent = 'Signing as ' + shortKey(signer.pubkey);
+    signerLabel.textContent = signer.mode === 'amber'
+      ? 'Amber account ' + shortKey(signer.pubkey) + ' · approval required for each signature'
+      : 'Signing as ' + shortKey(signer.pubkey);
     signerLine.textContent = signerLabel.textContent;
     connectUI.textContent = 'Change signer';
     disconnect.hidden = false;

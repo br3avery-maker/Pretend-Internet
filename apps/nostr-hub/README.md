@@ -56,3 +56,5 @@ The browser suite serves the built app over loopback and exercises simulated pub
 | Publishing | A disposable signer authorized a file upload, the app checked bytes after retrieval, then signed a manifest and verified it through a separate relay query. Review produced no upload or relay write. Unit tests also check retry and readback failure. |
 | Public source checks | Ditto returned signature-verified user and Puter events. Two declared track URLs responded as MPEG audio. The published 2048 Link game HTML ran a scoring move in an isolated browser with external requests blocked, and its score survived reload. |
 | Remaining device evidence | Android installation, Amber handoff on a phone, and real public publish delivery have yet to be exercised for this build. |
+
+For the configured Android-builder package, see [WebToApp import](webtoapp/README.md).
