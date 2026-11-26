@@ -1,5 +1,5 @@
 import { button, el, heading, label, link, modal, muted, query, route, run, setStatus, status } from '../lib/dom.js';
-import { bootstrap, endpoints, npub, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
+import { bootstrap, endpoints, npub, preferences, refreshIdentity, shortKey, transport, publicationRouter } from '../lib/nostr.js';
 import { publishingAccount, publishingSigner } from '../lib/account-session.js';
 import { execute, publicationHistory, mediaFile, verifyReview } from '../lib/publisher.js';
 import { all, get, put, setting, setSetting } from '../lib/store.js';
@@ -26,6 +26,8 @@ function receiptPanel(job) {
   const detail = el('details', { class: 'entry' }, el('summary', {}, `${job.title || typeNames[job.type]} · ${results[job.status] || job.status}`),
     job.event && el('p', {}, el('code', {}, job.event.id)),
     el('p', {}, `${Object.keys(job.uploads).length} verified Blossom files`),
+    job.relayPlan && el('details', {}, el('summary', {}, 'Relay routing evidence'), el('pre', {}, JSON.stringify(job.relayPlan,null,2))),
+    job.blossomPreflight?.length > 0 && el('details', {}, el('summary', {}, 'Blossom preflight (advisory)'), el('pre', {}, JSON.stringify(job.blossomPreflight,null,2))),
     job.uploadAttempts?.length > 0 && el('ul', { class: 'stack-tight' }, job.uploadAttempts.map(row => el('li', {}, el('code', {}, row.server), ' · ', row.status, ' · ', row.hash.slice(0, 12)))),
     job.attempts.length > 0 && el('ul', { class: 'stack-tight' }, job.attempts.map(row =>
       el('li', {}, el('code', {}, row.url), ' · ', row.verified ? 'Verified' : row.accepted ? 'Accepted' : row.code))),
@@ -264,7 +266,7 @@ export async function render(main) {
       const queued = async lock => {
         if (!lock) throw new Error('A publication is already in progress in another tab.');
         const history = await publicationHistory(selectedSigner.pubkey, selection, snapshot, await all('receipts'));
-        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, previous: history.previous, latestTimestamp: history.latestTimestamp, nextCreatedAt: history.nextCreatedAt, known: prepared?.known, backup: prepared?.backup,
+        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, router: publicationRouter(selection,selectedSigner), previous: history.previous, latestTimestamp: history.latestTimestamp, nextCreatedAt: history.nextCreatedAt, known: prepared?.known, backup: prepared?.backup,
           checkpoint: async value => { await put('receipts', value); setStatus(progress, value.status === 'uploading' ? 'Verified a Blossom upload.' : value.status === 'signed' ? 'Signed. Checking relay acceptance and readback.' : value.status); } });
         if (prepared && job.attempts.some(row => row.verified)) await put('events', job.event);
         await showReceipts();

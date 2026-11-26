@@ -149,6 +149,7 @@ await context.route('https://blossom.fixture.example/**', async request => {
   const data = blobMap.get(path.slice(1));
   return request.fulfill({ status:data?200:404, headers:{ 'access-control-allow-origin':'*' }, body:data || '' });
 });
+await context.route(/^https:\/\/(relay\.ditto\.pub|relay\.primal\.net|purplepag\.es)(\/|$)/, request => request.fulfill({contentType:'application/nostr+json',body:'{}'}));
 await context.route('https://media.fixture.example/fixture.wav', async request => {
   const data = Buffer.alloc(44 + 16000 * 5, 0);
   data.write('RIFF', 0); data.writeUInt32LE(data.length - 8, 4); data.write('WAVEfmt ',8);
@@ -232,6 +233,9 @@ try {
   await open('discover.html');
   await button('Refresh').click();
   await link('Test arcade').waitFor();
+  await button('Load older').click();
+  await page.getByText(/signed events returned in this historical page/).waitFor();
+  await page.getByText(/Relay history is not proof of network-wide completeness/).waitFor();
   assert.equal(remoteSiteRequests,0);
   await link('Test arcade').click();
   await h1('Test arcade').waitFor();

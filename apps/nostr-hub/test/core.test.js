@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { zipSync, strToU8 } from 'fflate';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { advanceCoverage, publicationRouter } from '../src/lib/nostr.js';
+import { fitsEventCache, eventCacheLimits } from '../src/lib/store.js';
 import { publicMutes, visibility } from '../src/lib/moderation.js';
 import { groupSites, safePath, siteURL } from '../src/lib/model.js';
 import { chaptersFromMarkdown } from '../src/lib/text.js';
@@ -214,4 +216,28 @@ test('Blossom fallback is limited to reviewed destinations and never bypasses si
   await assert.rejects(execute({...options,signer:{pubkey,sign:async()=>{throw Error('Denied')}}}),/Denied/);
   assert.deepEqual(calls,[primary]);
   await assert.rejects(execute({...options,draft:{...draft,fallbackServers:['http://localhost']}}),/distinct public HTTPS/);
+});
+
+
+test('inclusive historical coverage does not skip a saturated timestamp or claim an incomplete relay is finished',()=>{
+  const page={status:'limited',count:36,oldest:100};
+  assert.deepEqual(advanceCoverage(undefined,page,36),{until:100});
+  assert.deepEqual(advanceCoverage({until:100},page,36),{until:100,blocked:true});
+  assert.deepEqual(advanceCoverage({until:100},{status:'timeout',count:0},36),{until:100});
+  assert.deepEqual(advanceCoverage({until:100},{status:'complete',count:1,oldest:90},36),{done:true,until:90});
+  assert.equal(fitsEventCache({count:eventCacheLimits.count,bytes:0},1),false);
+  assert.equal(fitsEventCache({count:0,bytes:eventCacheLimits.bytes},1),false);
+});
+test('publication router inspects only reviewed relays and records incompatible policy',async()=>{
+  const secret=generateSecretKey(),pubkey=getPublicKey(secret);
+  const relay='wss://reviewed.fixture.example', other='wss://unreviewed.fixture.example';
+  const seen=[];
+  const transport={async query(url,filter){seen.push(url);return {events:[],status:'complete'};}};
+  const fetcher=async url=>{seen.push(url);return new Response(JSON.stringify({limitation:{max_content_length:1}}));};
+  const router=publicationRouter({relays:[relay]}, {pubkey}, transport,fetcher);
+  const e=finalizeEvent({kind:1,content:'long',tags:[],created_at:1},secret);
+  const plan=await router.plan(e,async template=>finalizeEvent(template,secret));
+  assert.ok(plan.excluded.some(row=>row.url===relay&&row.reasons.includes('content-size')));
+  assert.ok(seen.length>0 && seen.every(url=>url===relay || url==='https://reviewed.fixture.example/'));
+  assert.ok(!seen.includes(other));
 });

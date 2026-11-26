@@ -63,7 +63,16 @@ async function catalog(main, arcade) {
     if (active) await refreshIdentity(active);
     const result = await reloadCatalog(arcade && author ? [...siteKinds, kinds.appData] : siteKinds, author);
     await load();
+    coverage.textContent = result.coverage;
     setStatus(notice, result.reached ? `${result.count} signed events returned by ${result.reached} relays.` : 'No relays completed the query. Showing cached results.');
+  }));
+  const coverage = muted('Recent results only. Load older to extend the local history.');
+  const older = button('Load older', async () => {});
+  older.addEventListener('click', run(older, notice, async () => {
+    const result = await reloadCatalog(arcade && author ? [...siteKinds, kinds.appData] : siteKinds, author, {older:true});
+    await load();
+    coverage.textContent = result.coverage;
+    setStatus(notice, result.count + ' signed events returned in this historical page.');
   }));
   lookup.addEventListener('submit', run(find, notice, async () => {
     author = parseKey(publisher.value);
@@ -81,7 +90,7 @@ async function catalog(main, arcade) {
   for (const control of [saved, showHidden]) control.addEventListener('change', draw);
   main.replaceChildren(heading(arcade ? 'Arcade' : 'Discover', refresh), el('div', { class: 'split' }, authorLine, link('Switch profile', route('profile'))),
     !arcade && lookup, filter, el('div', { class: 'row' }, el('label', { class: 'check' }, saved, 'Saved'), el('label', { class: 'check' }, showHidden, 'Hidden publishers')),
-    notice, results);
+    el('div',{class:'row'},older), coverage, notice, results);
   await load();
   if (query.get('focus')) filter.focus();
 }

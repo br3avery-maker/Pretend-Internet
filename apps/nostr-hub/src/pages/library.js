@@ -42,14 +42,23 @@ async function bookshelf(main, writing) {
     if (active) await refreshIdentity(active);
     const result = await reloadCatalog([kinds.article]);
     await load();
+    coverage.textContent = result.coverage;
     setStatus(message, result.reached ? `${result.count} signed article events returned.` : 'No relays completed the query. Your saved shelf is still available.');
+  }));
+  const coverage = muted('Recent results only. Load older to extend the local history.');
+  const older = button('Load older', async () => {});
+  older.addEventListener('click', run(older, message, async () => {
+    const result = await reloadCatalog([kinds.article], setting('account', ''), {older:true});
+    await load();
+    coverage.textContent = result.coverage;
+    setStatus(message, result.count + ' signed events returned in this historical page.');
   }));
   search.addEventListener('input', draw);
   filter.addEventListener('change', draw);
   main.replaceChildren(heading(writing ? 'Writing' : 'Bookshelf', link('Curate', route('curate'), 'button')),
     el('nav', { class: 'tabs', 'aria-label': 'Library pages' }, ...[['library','Bookshelf'],['writing','Writing']].map(([page,title]) =>
       el('a', { class: 'button', href: route(page), 'aria-current': (page === 'writing') === writing ? 'page' : null }, title))), resume,
-    el('div', { class: 'row' }, search, filter), refresh, message, shelf);
+    el('div', { class: 'row' }, search, filter), refresh, older, coverage, message, shelf);
   await load();
 }
 async function details(main) {

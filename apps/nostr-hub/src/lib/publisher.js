@@ -189,7 +189,7 @@ function blobServers(draft, plan, usedServers = []) {
 }
 
 export async function execute({ draft, files, signer, transport, previous, checkpoint, upload = uploadVerified,
-  known, backup, latestTimestamp = 0, nextCreatedAt = Date.now(), verifyFiles = verifySavedFiles }) {
+  known, backup, latestTimestamp = 0, nextCreatedAt = Date.now(), verifyFiles = verifySavedFiles, router }) {
   verifyReview(draft, files);
   const plan = draft.site ? planSite(draft.site, signer.pubkey, files, backup) : null;
   const fingerprint = await jobId(signer.pubkey, draft, files);
@@ -212,12 +212,16 @@ export async function execute({ draft, files, signer, transport, previous, check
   const targets = pending.length ? uploadDestinations(draft) : [];
   job.uploadServers ??= {};
   job.uploadAttempts ??= [];
+  job.blossomPreflight ??= [];
   for (let offset = 0; offset < pending.length; offset += 32) {
     const batch = pending.slice(offset, offset + 32);
     const authorized = new Map();
     const unavailable = new Set();
     for (const file of batch) {
       if (job.uploads[file.hash]) continue;
+      if (router && job.blossomPreflight.length < 32) {
+        job.blossomPreflight.push(await router.preflight(file,targets));
+      }
       for (const server of targets) {
         if (unavailable.has(server)) continue;
         let signerFailed = false;
@@ -256,7 +260,13 @@ export async function execute({ draft, files, signer, transport, previous, check
   job.status = 'signed';
   await checkpoint(job);
   if (plan) await verifyHead();
+  if (router) {
+    job.relayPlan = await router.plan(job.event,sign);
+    await checkpoint(job);
+  }
+  const excluded = new Map((job.relayPlan?.excluded??[]).filter(row=>row.group==='author').map(row=>[row.url,row.reasons]));
   const outcomes = await Promise.all(draft.relays.map(async url => {
+    if (excluded.has(url)) return {url,accepted:false,verified:false,code:excluded.get(url).join(', ')};
     try {
       const entry = await transport.publish(url, job.event, { authPubkey: signer.pubkey, signAuth: sign });
       if (!plan || !entry.accepted) return { url, accepted: entry.accepted, verified: !plan && entry.verified === true, code: entry.code };

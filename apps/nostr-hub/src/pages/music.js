@@ -103,10 +103,19 @@ export async function render(main) {
       { authors: [author], kinds: [kinds.track], '#d': [...new Set(ids)].slice(0, 36) },
       endpoints([...setting('relays', []), ...bootstrap]), 36)));
     await load();
+    coverage.textContent = result.coverage;
     setStatus(notice, result.reached ? `${tracks.length} tracks and ${playlists.length} playlists available.` : 'No relays completed the query. Showing cached music.');
+  }));
+  const coverage = muted('Recent results only. Load older to extend the local history.');
+  const older = button('Load older', async () => {});
+  older.addEventListener('click', run(older, notice, async () => {
+    const result = await reloadCatalog([kinds.track, kinds.playlist], account, {older:true});
+    await load();
+    coverage.textContent = result.coverage;
+    setStatus(notice, result.count + ' signed events returned in this historical page.');
   }));
   search.addEventListener('input', draw);
   playlist.addEventListener('change', draw);
-  main.replaceChildren(heading('Music', refresh), link('Switch browsing profile', route('profile')), resumeUI, now, notice, search, label('Playlist', playlist), list);
+  main.replaceChildren(heading('Music', refresh), link('Switch browsing profile', route('profile')), resumeUI, now, notice, search, label('Playlist', playlist), older, coverage, list);
   await load();
 }
