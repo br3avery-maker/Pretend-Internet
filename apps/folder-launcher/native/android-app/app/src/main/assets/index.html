@@ -170,7 +170,35 @@ async function refresh(){if(recheckLock){refreshQueued=true;return}recheckLock=t
 async function chooseFolder(){if(NATIVE){window.AndroidLauncher.chooseFolder();closeSettings();return}if(typeof window.showDirectoryPicker==='function'){
 try{const h=await window.showDirectoryPicker({id:'launcher-apps',mode:'read'});if(!await getPermission(h,true)){status('Folder permission not granted');return}folder=h;await dbPut('settings','folder',h);activeSource='folder';await dbPut('settings','activeSource',activeSource);await refresh();closeSettings();return}catch(err){if(err.name==='AbortError')return;status('Folder picker unavailable here; use Import HTML/ZIP instead. ('+err.name+')');return}}
 $('folderInput').click();status('Select the directory. On some Web2App wrappers, folder selection is unavailable; use Import files instead.')}
-async function storeFiles(files){if(!files.length)return;let count=0;for(const f of files){if(!f.name)continue;await dbPut('files',f.name.toLowerCase(),{name:f.name,file:f});count++}activeSource='imports';await dbPut('settings','activeSource',activeSource);await scanCache();status(count+' files saved; '+entries.length+' matching apps');closeSettings()}
+async function dbImport(files){
+ const db=await storage();
+ const transaction=db.transaction(['files','settings'],'readwrite');
+ return new Promise((resolve,reject)=>{
+  transaction.oncomplete=()=>{db.close();resolve()};
+  transaction.onabort=()=>{db.close();reject(transaction.error||new Error('The storage transaction was interrupted'))};
+  try{
+   const records=transaction.objectStore('files');
+   for(const file of files)records.put({name:file.name,file},file.name.toLowerCase());
+   transaction.objectStore('settings').put('imports','activeSource');
+  }catch(error){
+   transaction.abort();
+   reject(error);
+  }
+ });
+}
+async function storeFiles(files){
+ const namedFiles=files.filter(file=>file.name);
+ if(!namedFiles.length)return;
+ try{await dbImport(namedFiles)}
+ catch(error){
+  openSettings();
+  status('Could not save imported files. '+error.message+' Try selecting the files again.');
+  return;
+ }
+ activeSource='imports';
+ await refresh();
+ closeSettings();
+}
 // A single-file HTML app works untouched. Relative links to sibling files are rewritten
 // to object URLs for images, scripts and styles when those files are in the selected folder.
 async function fileList(){if(activeSource==='folder'&&folder&&await getPermission(folder)){const out=[];for await(const [,handle] of folder.entries())if(handle.kind==='file')out.push(await handle.getFile());return out}return (await dbAll()).map(x=>x.file)}
@@ -245,7 +273,14 @@ window.addEventListener('popstate',()=>{if(active)returnHome(false)});
 window.addEventListener('focus',()=>{if(!active)refresh()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!active)refresh()});
 window.onNativeCatalogChanged=()=>refresh();window.onNativeAppReturned=()=>{returnHome(true);refresh()};$('gear').onclick=openSettings;$('dismiss').onclick=closeSettings;$('shade').onclick=e=>{if(e.target===$('shade'))closeSettings()};$('scan').onclick=refresh;$('choose').onclick=chooseFolder;$('emptyChoose').onclick=chooseFolder;$('back').onclick=()=>returnHome();$('help').onclick=openHelp;$('helpClose').onclick=closeHelp;$('helpShade').onclick=e=>{if(e.target===$('helpShade'))closeHelp()};document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if($('helpShade').classList.contains('show'))closeHelp();else if($('shade').classList.contains('show'))closeSettings()});if(NATIVE){document.querySelectorAll('[data-fallback]').forEach(el=>{el.hidden=true});$('intro').textContent='Drop game.html (optionally game.png) or game.zip containing a website into the folder you chose. The launcher reads it directly; nothing is copied or unpacked.';}
 $('import').onclick=()=>{status('Select HTML, optional matching images, or ZIP apps.');$('filesInput').click()};$('clear').onclick=async()=>{await dbClear('files');await refresh();status('Imported copies cleared')};
-$('folderInput').onchange=async e=>{await storeFiles([...e.target.files]);e.target.value=''};$('filesInput').onchange=async e=>{await storeFiles([...e.target.files]);e.target.value=''};
+function importSelection(event){
+ const input=event.target;
+ const files=[...input.files];
+ input.value='';
+ void storeFiles(files);
+}
+$('folderInput').onchange=importSelection;
+$('filesInput').onchange=importSelection;
 (async()=>{if(!NATIVE){try{folder=await dbGet('settings','folder');activeSource=(await dbGet('settings','activeSource'))==='imports'?'imports':'folder'}catch{folder=null}}await refresh()})().catch(e=>status(e.message));
 })();
 </script>
