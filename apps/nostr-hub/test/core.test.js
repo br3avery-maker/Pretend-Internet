@@ -30,6 +30,7 @@ test('normalizes HTML and folder ZIP for review, hashes each file and rejects un
   assert.match(single.hash, /^[0-9a-f]{64}$/);
   const archive = new File([zipSync({ 'test/index.html': strToU8('<h1>Test</h1>'), 'test/style.css': strToU8('body{}') })], 'test.zip');
   assert.deepEqual((await siteFiles([archive])).map(file => file.path), ['/index.html', '/style.css']);
+  assert.deepEqual((await siteFiles([archive], { partial: true })).map(file => file.path), ['/test/index.html', '/test/style.css']);
   const invalid = new File([zipSync({ 'index.html': strToU8('text'), '../bad.html': strToU8('bad') })], 'invalid.zip');
   await assert.rejects(siteFiles([invalid]), /invalid path/);
   assert.throws(() => safePath('/folder/%2e%2e/index.html'));

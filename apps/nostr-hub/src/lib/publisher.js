@@ -52,7 +52,7 @@ export async function siteFiles(selected, { partial = false } = {}) {
     }));
   }
   const input = files.map(file => ({ ...file, path: safePath(file.path) }));
-  if (!input.some(file => file.path === 'index.html')) {
+  if ((!partial || first.webkitRelativePath) && !input.some(file => file.path === 'index.html')) {
     const root = input[0]?.path.split('/')[0];
     if (root && input.every(file => file.path.startsWith(root + '/'))
         && (first.webkitRelativePath || input.some(file => file.path === root + '/index.html'))) {

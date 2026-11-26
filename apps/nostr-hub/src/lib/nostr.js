@@ -58,7 +58,11 @@ export async function preferences(author) {
 }
 export async function refreshIdentity(author) {
   const requested = endpoints([...setting('relays', []), ...bootstrap]);
-  return fetchEvents({ authors: [author], kinds: [kinds.profile, kinds.relayList, kinds.blossom, kinds.muteList] }, requested, 12);
+  const results = await Promise.all([
+    fetchEvents({ authors: [author], kinds: [kinds.profile, kinds.relayList, kinds.blossom] }, requested, 12),
+    fetchEvents({ authors: [author], kinds: [kinds.muteList] }, requested, 12),
+  ]);
+  return { events: results.flatMap(row => row.events), relays: results.flatMap(row => row.relays) };
 }
 export async function reloadCatalog(kindsList, author = setting('account', '')) {
   const profiles = author ? await preferences(author) : { write: [], read: [] };

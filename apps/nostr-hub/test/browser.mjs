@@ -269,6 +269,9 @@ try {
   await page.getByText('3 tracks and 1 playlists available.').waitFor();
   await page.locator('audio').dispatchEvent('ended');
   await playing('Third fixture song').waitFor();
+  events.push(finalizeEvent({kind:36787,content:'',created_at:time+1,tags:[['d','third'],['title','Updated third fixture song'],['url','https://media.fixture.example/fixture.wav']]},another));
+  await button('Refresh music').click();
+  await page.getByRole('region',{name:'Tracks'}).getByRole('heading',{name:'Updated third fixture song',exact:true}).waitFor();
   await snap('music');
 
   await open('writing.html');

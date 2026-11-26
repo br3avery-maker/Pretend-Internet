@@ -89,18 +89,17 @@ export async function render(main) {
     const result = await reloadCatalog([kinds.track, kinds.playlist], account);
     const excluded = await moderation(account);
     const found = newestByAddress(await cached([kinds.playlist], account)).filter(event => !excluded(event));
-    const missing = new Map();
-    const available = new Set((await cached([kinds.track])).map(key));
+    const referenced = new Map();
     for (const collection of found.slice(0, 4)) {
       for (const ref of tags(collection, 'a')) {
         const [,author,id] = /^36787:([0-9a-f]{64}):(.+)$/.exec(ref[1]) ?? [];
-        if (author && !available.has(ref[1])) {
-          if (!missing.has(author)) missing.set(author, []);
-          missing.get(author).push(id);
+        if (author) {
+          if (!referenced.has(author)) referenced.set(author, []);
+          referenced.get(author).push(id);
         }
       }
     }
-    await Promise.all([...missing].slice(0, 4).map(([author, ids]) => fetchEvents(
+    await Promise.all([...referenced].sort(([a],[b]) => Number(a === account) - Number(b === account)).slice(0, 4).map(([author, ids]) => fetchEvents(
       { authors: [author], kinds: [kinds.track], '#d': [...new Set(ids)].slice(0, 36) },
       endpoints([...setting('relays', []), ...bootstrap]), 36)));
     await load();

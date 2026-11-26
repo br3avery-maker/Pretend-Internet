@@ -1,7 +1,7 @@
 import { button, el, heading, icon, label, link, muted, query, route, run, setStatus, status } from '../lib/dom.js';
 import { books, findBook, importBook, renderChapter } from '../lib/books.js';
 import { groupSites, kinds, matchesWords } from '../lib/model.js';
-import { cached, preferences, reloadCatalog, shortKey } from '../lib/nostr.js';
+import { cached, preferences, refreshIdentity, reloadCatalog, shortKey } from '../lib/nostr.js';
 import { saveCollections, setting, setSetting } from '../lib/store.js';
 
 const localBook = id => route('book', { book: id });
@@ -38,6 +38,8 @@ async function bookshelf(main, writing) {
   const refresh = button('Find writing', async () => {});
   refresh.addEventListener('click', run(refresh, message, async () => {
     setStatus(message, 'Looking for signed long-form writing.');
+    const active = setting('account', '');
+    if (active) await refreshIdentity(active);
     const result = await reloadCatalog([kinds.article]);
     await load();
     setStatus(message, result.reached ? `${result.count} signed article events returned.` : 'No relays completed the query. Your saved shelf is still available.');
