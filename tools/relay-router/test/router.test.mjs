@@ -204,3 +204,17 @@ test('an asynchronous or denied destination policy fails closed before network a
   let accessed=false;const r=router(['wss://a.example'],{allowDestination:async()=>true,fetch:async()=>{accessed=true;}});
   const plan=await r.discover(event(),{redundancy:1});assert.equal(accessed,false);assert.equal(plan.groups[0].selected.length,0);
 });
+
+
+test('explicit authenticated query reads signed events; ordinary queries do not sign',async t=>{
+  const server=await serve({authRead:true,metadata:[event()]});t.after(()=>server.close());
+  const client=new RelayTransport({timeout:2000});
+  const e=event();
+  await client.publish(server.url,e,{readback:false});
+  await assert.rejects(client.query(server.url,{ids:[e.id]},2),/auth-required/);
+  assert.equal(server.authEvents.length,0);
+  await assert.rejects(client.query(server.url,{ids:[e.id]},2,{authPubkey:pubkey,signAuth:async template=>finalizeEvent({...template,content:'changed'},key)}),/auth-mismatch/);
+  const result=await client.query(server.url,{ids:[e.id]},2,{authPubkey:pubkey,signAuth:async template=>finalizeEvent(template,key)});
+  assert.ok(result.events.some(row=>row.id===e.id));
+  assert.equal(server.authEvents.length,1);
+});

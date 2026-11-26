@@ -1,0 +1,51 @@
+name: PR Review Readiness
+# AgentOps gate: read existing review evidence only; never request reviews or merge.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request to evaluate
+        required: true
+        type: number
+      head_sha:
+        description: Exact expected PR head SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+jobs:
+  review-readiness:
+    name: PR Review Readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout trusted base gate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Checkout head only for first gate adoption
+        if: ${{ hashFiles('scripts/pr_review_gate.py') == '' && github.event_name == 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: gate-adoption
+          persist-credentials: false
+      - name: Run exact-head AgentOps review gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gate=scripts/pr_review_gate.py
+          if [ ! -f "$gate" ]; then
+            gate=gate-adoption/scripts/pr_review_gate.py
+            test "$(git hash-object "$gate")" = "d2af73f0d5b43f9753c43c61f4b7e7a5750e49d4"
+          fi
+          python3 -B "$gate" --repo "$PR_REPO" --pr "$PR_NUMBER" --expect-head "$PR_HEAD_SHA" --wait-seconds 300 --poll-seconds 15

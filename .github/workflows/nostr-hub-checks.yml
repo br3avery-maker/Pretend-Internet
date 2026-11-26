@@ -1,0 +1,47 @@
+name: Nostr Hub build, unit and browser regressions
+
+on:
+  pull_request:
+    paths:
+      - 'apps/nostr-hub/**'
+      - 'tools/relay-router/**'
+      - 'tools/test-support/**'
+      - '.github/workflows/nostr-hub-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/nostr-hub/**'
+      - 'tools/relay-router/**'
+      - 'tools/test-support/**'
+      - '.github/workflows/nostr-hub-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nostr-hub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        run: |
+          npm ci --prefix tools/test-support
+          npm ci --prefix tools/relay-router
+          npm ci --prefix apps/nostr-hub
+      - name: Run relay-router regression tests
+        run: npm test --prefix tools/relay-router
+      - name: Build Nostr Hub
+        run: npm run build --prefix apps/nostr-hub
+      - name: Run Nostr Hub unit tests
+        run: npm test --prefix apps/nostr-hub
+      - name: Install Chromium for fixture-backed browser checks
+        run: npx --prefix apps/nostr-hub playwright install --with-deps chromium --only-shell
+      - name: Run Nostr Hub mobile browser regressions
+        run: node apps/nostr-hub/test/browser.mjs

@@ -49,6 +49,7 @@ See [MVP acceptance and evidence](docs/MVP.md) and [the main portfolio issue #27
 | [Root development shelf](index.html) and [Pocket Counter template](templates/mini-app/) | Source and small demonstration are present. **Not** the Pretend Internet as an experience; no complete root APK has been established from this README. |
 | [Folder Launcher v0.2](apps/folder-launcher/README.md) | Independently useful Android HTML/ZIP launcher, with clean build evidence and **owner-attested** device verification. It is a candidate entry point, **not** proof two independent applications have passed the portfolio milestone. |
 | [Browser Nsite Archive](apps/nsite-archive/README.md) and [Node archive tool](tools/nsite-archive/README.md) | Separate historical archive implementations with their own tests and limitations. **Not** the entire Internet and **not** permission to download remote sites during discovery. |
+| [Pretend Internet Nostr app](apps/nostr-hub/README.md) | Multi-page mobile web app for signed discovery, games, music, writing, offline books, and reviewed publishing. Browser verification uses disposable publishing endpoints. |
 | [Relay Router](tools/relay-router/) | Independent Nostr routing component; optional for applications that need it. |
 | Other readers, media players, creative tools, publishing experiments and shells | Some source may be in separate repos, Library archives or WebToApp. Current provenance, functionality and host suitability must be recovered and verified individually. |
 

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "0.1",
+  "id": "nostr-hub",
+  "name": "Pretend Internet",
+  "version": "0.2.1",
+  "status": "testing",
+  "summary": "Browse sites, play games and music, read books and publish to Nostr.",
+  "entry": "index.html",
+  "offline": true,
+  "storage": "Browser local storage for preferences and IndexedDB for local content and publish attachments.",
+  "permissions": ["Public Nostr relay reads", "User-directed local file import", "External signer approval for publishing"],
+  "help": {
+    "purpose": "A local-first place to find, open and keep sites, games, music and books.",
+    "start": "Explore the bookshelf or add a public Nostr profile in the profile menu.",
+    "limitations": "Relay, media and public site availability depends on network access. Signing requires a compatible provider.",
+    "data": "Bookmarks, reading position, collections, cached events and draft files stay in this browser."
+  }
+}
