@@ -148,8 +148,8 @@ test('completed article operations are immutable and A-B-A creates a newer signe
   assert.equal(retry.event.id, revert.event.id);
   assert.equal(retry.status, 'verified');
   assert.equal(receipts.size, 3);
-  assert.deepEqual(receipts.get(a.id), a);
-  assert.deepEqual(receipts.get(b.id), b);
+  assert.deepEqual(receipts.get(a.id), structuredClone(a));
+  assert.deepEqual(receipts.get(b.id), structuredClone(b));
 });
 
 
