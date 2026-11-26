@@ -549,7 +549,11 @@ try {
   await page.waitForFunction(() => [...document.querySelectorAll('main label')].find(label => label.firstChild?.textContent === 'Title')?.querySelector('input').value === 'A new story');
   assert.equal(await page.getByLabel('Stable identifier for updates').inputValue(),'a-new-story');
   await open('help.html');
-  const [download] = await Promise.all([page.waitForEvent('download'),button('Export local backup').click()]);
+  const downloadPromise=page.waitForEvent('download',{timeout:20000});
+  await button('Export local backup').click();
+  await page.locator('main [role=status]:not([hidden])').waitFor();
+  assert.match(await page.locator('main [role=status]:not([hidden])').textContent(),/Backup bytes validated/);
+  const download=await downloadPromise;
   const archive=await download.path();
   const recoveredContext=await browser.newContext();
   const recoveredPage=await recoveredContext.newPage();
@@ -584,7 +588,7 @@ try {
   console.log('The authorized remote signer session survived reload and signed as the same account.');
   if (packaged) console.log('Packaged Amber callback passed profile-first sign-in, sign-in persistence, stale callback rejection, cancellation, exact signature verification, and relay authentication with no clipboard fields.');
 } catch (error) {
-  console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught);
+  console.error('Last route:', new URL(page.url()).pathname, 'Browser errors:', uncaught, 'Visible status:', await page.locator('main [role=status]:not([hidden])').allTextContents());
   throw error;
 } finally {
   await browser.close();
