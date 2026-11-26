@@ -1,7 +1,7 @@
 import { button, el, heading, label, link, modal, muted, query, route, run, setStatus, status } from '../lib/dom.js';
 import { bootstrap, endpoints, npub, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
 import { publishingAccount, publishingSigner } from '../lib/account-session.js';
-import { execute, jobId, mediaFile, verifyReview } from '../lib/publisher.js';
+import { execute, publicationHistory, mediaFile, verifyReview } from '../lib/publisher.js';
 import { all, get, put, setting, setSetting } from '../lib/store.js';
 import { siteURL } from '../lib/model.js';
 import { siteIntake } from '../lib/site-intake.js';
@@ -247,8 +247,8 @@ export async function render(main) {
       review.addEventListener('cancel', lockClose);
       const queued = async lock => {
         if (!lock) throw new Error('A publication is already in progress in another tab.');
-        const prior = await get('receipts', await jobId(selectedSigner.pubkey, selection, snapshot));
-        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, previous: prior, known: prepared?.known, backup: prepared?.backup,
+        const history = await publicationHistory(selectedSigner.pubkey, selection, snapshot, await all('receipts'));
+        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, previous: history.previous, latestTimestamp: history.latestTimestamp, known: prepared?.known, backup: prepared?.backup,
           checkpoint: async value => { await put('receipts', value); setStatus(progress, value.status === 'uploading' ? 'Verified a Blossom upload.' : value.status === 'signed' ? 'Signed. Checking relay acceptance and readback.' : value.status); } });
         if (prepared && job.attempts.some(row => row.verified)) await put('events', job.event);
         await showReceipts();

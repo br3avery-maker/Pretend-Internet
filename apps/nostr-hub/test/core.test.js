@@ -4,7 +4,7 @@ import { zipSync, strToU8 } from 'fflate';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { groupSites, safePath, siteURL } from '../src/lib/model.js';
 import { chaptersFromMarkdown } from '../src/lib/text.js';
-import { execute, siteFiles, uploadVerified } from '../src/lib/publisher.js';
+import { execute, publicationHistory, siteFiles, uploadVerified } from '../src/lib/publisher.js';
 
 const author = 'a'.repeat(64);
 const event = (id, timestamp, title, slug = 'game') => ({
@@ -118,4 +118,36 @@ test('keeps the owner and address on partial update, refuses a collision or fore
   assert.deepEqual(restored.event.tags.filter(parts => parts[0] === 'path'), baseline.tags.filter(parts => parts[0] === 'path'));
   assert.equal(uploaded, 1);
   assert.equal(writes, 2);
+});
+
+
+test('completed article operations are immutable and A-B-A creates a newer signed event; incomplete retry reuses it', async () => {
+  const secret = generateSecretKey();
+  const signer = { pubkey: getPublicKey(secret), sign: async value => finalizeEvent(value, secret) };
+  const receipts = new Map();
+  let available = true;
+  const draft = { type: 'article', title: 'Article', slug: 'article', body: 'A', relays: ['wss://relay.fixture.example'] };
+  async function publish(body) {
+    const reviewed = { ...draft, body };
+    const history = await publicationHistory(signer.pubkey, reviewed, [], [...receipts.values()]);
+    return execute({ draft: reviewed, files: [], signer, previous: history.previous, latestTimestamp: history.latestTimestamp,
+      checkpoint: async row => receipts.set(row.id, structuredClone(row)),
+      transport: { async publish() { return { accepted: true, verified: available, code: 'accepted' }; } } });
+  }
+  const a = await publish('A');
+  const b = await publish('B');
+  available = false;
+  const revert = await publish('A');
+  assert.notEqual(revert.id, a.id);
+  assert.notEqual(revert.event.id, a.event.id);
+  assert.ok(revert.event.created_at > b.event.created_at);
+  assert.equal(revert.status, 'accepted-unverified');
+  available = true;
+  const retry = await publish('A');
+  assert.equal(retry.id, revert.id);
+  assert.equal(retry.event.id, revert.event.id);
+  assert.equal(retry.status, 'verified');
+  assert.equal(receipts.size, 3);
+  assert.deepEqual(receipts.get(a.id), a);
+  assert.deepEqual(receipts.get(b.id), b);
 });

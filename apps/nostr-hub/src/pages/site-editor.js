@@ -1,9 +1,9 @@
 import { el, label, query, run, setStatus, status } from '../lib/dom.js';
 import { groupSites, kinds, siteURL, tag } from '../lib/model.js';
 import { bootstrap, cached, endpoints, npub, preferences, reloadCatalog, transport } from '../lib/nostr.js';
-import { jobId } from '../lib/publisher.js';
+import { publicationHistory } from '../lib/publisher.js';
 import { assertHeads, planSite, siteHeads } from '../lib/site-publication.js';
-import { all, get, setting } from '../lib/store.js';
+import { all, setting } from '../lib/store.js';
 
 const siteKinds = [kinds.root, kinds.site];
 const requested = query.get('site') || '';
@@ -124,8 +124,8 @@ export function siteEditor({ title, identifier, text, signer, onChange }) {
       site.servers = creating() ? [] : blossom;
       site.readRelays = endpoints([...setting('relays', []).slice(0, 3), ...write.slice(0, 3), ...read.slice(0, 3), ...bootstrap]);
       const known = (await cached([site.root ? kinds.root : kinds.site], owner)).find(event => site.root || tag(event, 'd') === site.slug);
-      const retry = await get('receipts', await jobId(owner, { ...draft, site }, files));
-      if (retry?.status === 'verified' && site.mode === 'create') throw new Error('This address has already been published. Choose Update existing nsite.');
+      const { previous: retry, completed } = await publicationHistory(owner, { ...draft, site }, files, await all('receipts'));
+      if (completed && site.mode === 'create') throw new Error('This address has already been published. Choose Update existing nsite.');
       assertHeads(await siteHeads(transport, [...draft.relays, ...site.readRelays], site), draft.relays, plan.current, known, retry?.event);
       return { site, plan, known, backup: site.restore };
     },

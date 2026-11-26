@@ -49,8 +49,8 @@ const events = [
   sign(30023, '# Example article\n\nThis article came from a signed event.', [['d','article'],['title','Example article']]),
   sign(36787, '', [['d','track'],['title','Fixture song'],['artist','Fixture artist'],['url','https://media.fixture.example/fixture.wav']]),
   sign(36787, '', [['d','second'],['title','Second fixture song'],['url','https://media.fixture.example/fixture.wav']]),
-  sign(36787, '', [['d','third'],['title','Third fixture song'],['url','https://media.fixture.example/fixture.wav']]),
-  sign(34139, '', [['d','library'],['title','Fixture playlist'], ...['track','second','third'].map(id => ['a',`36787:${pubkey}:${id}`])]),
+  sign(36787, '', [['d','third'],['title','Third fixture song'],['url','https://media.fixture.example/fixture.wav']], another),
+  sign(34139, '', [['d','library'],['title','Fixture playlist'], ...['track','second'].map(id => ['a',`36787:${pubkey}:${id}`]), ['a',`36787:${secondaryPubkey}:third`]]),
   sign(0, JSON.stringify({ display_name:'Tampered' }), [], another),
 ];
 events.at(-1).content = '{"display_name":"Bad signature"}';
@@ -230,7 +230,10 @@ try {
   await open('music.html');
   await button('Refresh music').click();
   await page.getByRole('heading',{name:'Fixture song',exact:true}).waitFor();
+  await page.getByText('3 tracks and 1 playlists available.').waitFor();
+  assert.equal(await page.getByRole('region',{name:'Tracks'}).getByRole('heading',{name:'Third fixture song',exact:true}).count(),0);
   await page.getByLabel('Playlist').selectOption({label:'Fixture playlist'});
+  await page.getByRole('region',{name:'Tracks'}).getByRole('heading',{name:'Third fixture song',exact:true}).waitFor();
   await page.getByRole('region',{name:'Tracks'}).locator('article').filter({hasText:'Second fixture song'}).getByRole('button',{name:'Play'}).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentTime > 0);
   const playing = name => page.getByRole('heading',{level:2,name,exact:true});

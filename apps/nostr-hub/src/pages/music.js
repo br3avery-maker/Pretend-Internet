@@ -58,7 +58,7 @@ export async function render(main) {
   function draw() {
     const selected = playlists.find(event => key(event) === playlist.value);
     const refs = selected ? tags(selected, 'a').map(parts => parts[1]) : null;
-    const ordered = refs ? refs.map(ref => tracks.find(event => key(event) === ref)).filter(Boolean) : tracks;
+    const ordered = refs ? refs.map(ref => tracks.find(event => key(event) === ref)).filter(Boolean) : tracks.filter(event => !account || event.pubkey === account);
     const wanted = ordered.filter(event => matchesWords(search.value, title(event), artist(event)));
     queue = ordered.filter(event => source(event));
     list.replaceChildren(...wanted.map(event => el('article', { class: 'entry split' },
@@ -72,8 +72,9 @@ export async function render(main) {
   }
   async function load() {
     const selected = playlist.value;
-    tracks = newestByAddress(await cached([kinds.track], account));
     playlists = newestByAddress(await cached([kinds.playlist], account));
+    const references = new Set(playlists.flatMap(event => tags(event, 'a').map(parts => parts[1])));
+    tracks = newestByAddress(await cached([kinds.track])).filter(event => !account || event.pubkey === account || references.has(key(event)));
     playlist.replaceChildren(el('option', { value: '' }, 'All tracks'), ...playlists.map(event => el('option', { value: key(event) }, title(event))));
     if (playlists.some(event => key(event) === selected)) playlist.value = selected;
     draw();
@@ -84,11 +85,11 @@ export async function render(main) {
     const result = await reloadCatalog([kinds.track, kinds.playlist], account);
     const found = newestByAddress(await cached([kinds.playlist], account));
     const missing = new Map();
-    const available = new Set((await cached([kinds.track], account)).map(key));
+    const available = new Set((await cached([kinds.track])).map(key));
     for (const collection of found.slice(0, 4)) {
       for (const ref of tags(collection, 'a')) {
         const [,author,id] = /^36787:([0-9a-f]{64}):(.+)$/.exec(ref[1]) ?? [];
-        if (author && !available.has(ref[1]) && (!account || account === author)) {
+        if (author && !available.has(ref[1])) {
           if (!missing.has(author)) missing.set(author, []);
           missing.get(author).push(id);
         }
