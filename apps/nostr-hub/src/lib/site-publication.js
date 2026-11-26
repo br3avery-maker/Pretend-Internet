@@ -57,11 +57,11 @@ export function planSite(site, author, files, backup) {
     uploads: [...paths.values()].filter(file => file.bytes) };
 }
 
-export async function siteHeads(client, urls, { owner, root, slug }) {
+export async function siteHeads(client, urls, { owner, root, slug }, { authRelays = [], signAuth } = {}) {
   const filter = { authors: [owner], kinds: [kind(root)], ...(!root && { '#d': [slug] }) };
   return Promise.all([...new Set(urls)].map(async url => {
     try {
-      const { events, status } = await client.query(url, filter, 25);
+      const { events, status } = await client.query(url, filter, 25, authRelays.includes(url) && signAuth ? { authPubkey: owner, signAuth } : undefined);
       const winner = events.filter(event => event.pubkey === owner && event.kind === kind(root)
         && (root || tag(event, 'd') === slug)).map(signedEvent).sort(recent)[0];
       return { url, complete: status === 'complete', winner };

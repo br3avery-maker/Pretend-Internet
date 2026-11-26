@@ -32,6 +32,8 @@ jobs:
         run: |
           npm ci --prefix tools/relay-router
           npm ci --prefix apps/nostr-hub
+      - name: Run relay-router regression tests
+        run: npm test --prefix tools/relay-router
       - name: Build Nostr Hub
         run: npm run build --prefix apps/nostr-hub
       - name: Run Nostr Hub unit tests

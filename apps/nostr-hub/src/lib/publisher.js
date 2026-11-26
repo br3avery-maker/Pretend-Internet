@@ -191,7 +191,7 @@ export async function execute({ draft, files, signer, transport, previous, check
   };
   const sign = async value => checkSignature(value, await signer.sign(structuredClone(value)), signer.pubkey);
   const verifyHead = async () => assertHeads(
-    await siteHeads(transport, [...draft.relays, ...draft.site.readRelays], draft.site), draft.relays, plan.current, known, job.event,
+    await siteHeads(transport, [...draft.relays, ...draft.site.readRelays], draft.site, { authRelays: draft.relays, signAuth: sign }), draft.relays, plan.current, known, job.event,
   );
   if (plan) {
     await verifyHead();
@@ -226,7 +226,7 @@ export async function execute({ draft, files, signer, transport, previous, check
     try {
       const entry = await transport.publish(url, job.event, { authPubkey: signer.pubkey, signAuth: sign });
       if (!plan || !entry.accepted) return { url, accepted: entry.accepted, verified: !plan && entry.verified === true, code: entry.code };
-      const [head] = await siteHeads(transport, [url], draft.site);
+      const [head] = await siteHeads(transport, [url], draft.site, { authRelays: [url], signAuth: sign });
       const verified = head.complete && head.winner?.id === job.event.id;
       return { url, accepted: true, verified, code: verified ? entry.code : 'current-version-unverified' };
     } catch (error) { return { url, accepted: false, verified: false, code: error.code || 'unavailable' }; }

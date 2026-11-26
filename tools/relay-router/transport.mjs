@@ -90,35 +90,46 @@ class Session {
   close() { if(this.socket.readyState<2) this.socket.close(); }
 }
 
-export class RelayTransport {
-  constructor(options={}) { this.options=options; }
-  async query(url,filter,limit=64) {
-    const session=new Session(url,this.options);
-    try { await session.connect(); return await session.query(filter,limit); }
-    finally { session.close(); }
-  }
-  async publish(url,event,{signAuth,authPubkey,readback=true}={}) {
-    const session=new Session(url,this.options);
-    try {
-      await session.connect();
-      let ok=await session.write('EVENT',event); let authenticated=false;
-      const authenticate=async()=>{
+async function authenticate(session,url,{signAuth,authPubkey},options) {
         if(!session.challenge||!signAuth) throw new RelayFailure('auth-required');
         const template={kind:22242,created_at:Math.floor(Date.now()/1000),content:'',
           tags:[['relay',url],['challenge',session.challenge]]};
         const frozen=JSON.stringify(template);let auth;
         try { auth=signedEvent(await bounded(Promise.resolve().then(()=>signAuth(structuredClone(template))),
-          this.options.signerTimeout??60000,'auth-timeout')); }
+          options.signerTimeout??60000,'auth-timeout')); }
         catch { throw new RelayFailure('auth-denied'); }
         const actual={kind:auth.kind,created_at:auth.created_at,content:auth.content,tags:auth.tags};
         if(!authPubkey || auth.pubkey!==authPubkey || JSON.stringify(actual)!==frozen)
           throw new RelayFailure('auth-mismatch');
         const authOK=await session.write('AUTH',auth);
         if(!authOK[2]) throw new RelayFailure(rejection(authOK[3]));
-        authenticated=true;
-      };
+}
+
+export class RelayTransport {
+  constructor(options={}) { this.options=options; }
+  async query(url,filter,limit=64,{signAuth,authPubkey}={}) {
+    const session=new Session(url,this.options);
+    try {
+      await session.connect();
+      let result;
+      try { result=await session.query(filter,limit); }
+      catch(error) {
+        if(error.code!=='auth-required'||!signAuth) throw error;
+      }
+      if(result?.status!=='auth-required' && result) return result;
+      if(!signAuth) return result;
+      await authenticate(session,url,{signAuth,authPubkey},this.options);
+      return await session.query(filter,limit);
+    } finally { session.close(); }
+  }
+  async publish(url,event,{signAuth,authPubkey,readback=true}={}) {
+    const session=new Session(url,this.options);
+    try {
+      await session.connect();
+      let ok=await session.write('EVENT',event); let authenticated=false;
+      const approve=async()=>{ await authenticate(session,url,{signAuth,authPubkey},this.options); authenticated=true; };
       if(!ok[2] && rejection(ok[3])==='auth-required' && signAuth) {
-        await authenticate();ok=await session.write('EVENT',event);
+        await approve();ok=await session.write('EVENT',event);
       }
       const code=ok[2]?'accepted':rejection(ok[3]);
       if(!ok[2] && code!=='duplicate') return {accepted:false,verified:false,code,authenticated};
@@ -128,7 +139,7 @@ export class RelayTransport {
         try { got=await session.query({ids:[event.id]},1); }
         catch(error) {
           if(error.code!=='auth-required'||authenticated||!signAuth)throw error;
-          await authenticate();got=await session.query({ids:[event.id]},1);
+          await approve();got=await session.query({ids:[event.id]},1);
         }
         const verified=got.events.some(x=>x.id===event.id);
         return {accepted:true,verified,code,authenticated,readback:verified?'verified':got.status==='complete'?'missing':got.status};

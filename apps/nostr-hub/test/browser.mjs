@@ -57,6 +57,7 @@ events.at(-1).content = '{"display_name":"Bad signature"}';
 const writes = [];
 let uploads = 0;
 let authentications = 0;
+let authenticatedAddressReads = 0;
 let remoteSiteRequests = 0;
 const uncaught = [];
 const context = await browser.newContext({
@@ -68,11 +69,13 @@ await context.routeWebSocket(/^wss:\/\//, connection => {
   connection.onMessage(data => {
     const [verb,id,filter] = JSON.parse(data);
     if (verb === 'REQ') {
-      if (filter.ids && !authenticated) {
+      const addressRead = filter.limit === 25 && filter.kinds?.includes(35128) && /relay\.ditto\.pub/.test(connection.url());
+      if ((filter.ids || addressRead) && !authenticated) {
         connection.send(JSON.stringify(['AUTH','fixture-read-challenge']));
         connection.send(JSON.stringify(['CLOSED',id,'auth-required: authenticate to read this event']));
         return;
       }
+      if (addressRead && authenticated) authenticatedAddressReads++;
       subscriptions.set(id,filter);
       for (const event of events.filter(event => matchFilter(filter,event)).slice(0,filter.limit ?? 100))
         connection.send(JSON.stringify(['EVENT',id,event]));
@@ -361,7 +364,8 @@ try {
   assert.equal(writes.length,1);
   assert.equal(writes[0].kind,35128);
   assert.equal(uploads,3);
-  assert.equal(authentications,1);
+  assert.ok(authentications >= 2);
+  assert.ok(authenticatedAddressReads >= 2, 'Authenticated nsite address preflight and readback');
   assert.ok([...blobMap.values()].some(data => data.equals(newSite)));
   await page.getByText(/Verified by relay readback/).waitFor();
   await page.reload();

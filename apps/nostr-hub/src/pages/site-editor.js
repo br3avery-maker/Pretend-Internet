@@ -126,7 +126,10 @@ export function siteEditor({ title, identifier, text, signer, onChange }) {
       const known = (await cached([site.root ? kinds.root : kinds.site], owner)).find(event => site.root || tag(event, 'd') === site.slug);
       const { previous: retry, completed } = await publicationHistory(owner, { ...draft, site }, files, await all('receipts'));
       if (completed && site.mode === 'create') throw new Error('This address has already been published. Choose Update existing nsite.');
-      assertHeads(await siteHeads(transport, [...draft.relays, ...site.readRelays], site), draft.relays, plan.current, known, retry?.event);
+      const selectedSigner = signer();
+      assertHeads(await siteHeads(transport, [...draft.relays, ...site.readRelays], site, {
+        authRelays: draft.relays, signAuth: value => selectedSigner.sign(value),
+      }), draft.relays, plan.current, known, retry?.event);
       return { site, plan, known, backup: site.restore };
     },
   };

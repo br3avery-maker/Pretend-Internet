@@ -209,7 +209,7 @@ export async function render(main) {
     let prepared;
     if (selection.type === 'nsite') {
       if (publishingAccount()?.pubkey !== selectedSigner.pubkey) throw new Error('Confirm your publishing account again.');
-      setStatus(formMessage, 'Checking the signed nsite address and version.');
+      setStatus(formMessage, 'Checking the signed nsite address and version. Selected relays may ask you to approve read authentication.');
       prepared = await editor.prepare(selection, snapshot, selectedSigner.pubkey);
       selection.site = prepared.site;
       setStatus(formMessage, '');
