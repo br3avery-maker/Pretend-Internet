@@ -33,7 +33,7 @@ function validSetting(key,v) {
   if (['relays','blossom','approved-publications','saved-sites'].includes(key)) return strings(v);
   if (key==='collections') return Array.isArray(v)&&v.every(x=>fields(x,['name','items'])&&text(x.name,60)&&strings(x.items));
   if (key==='book-edits') return objectRows(v,x=>fields(x,['title','author','series','topics'])&&Object.entries(x).every(([k,y])=>k==='topics'?strings(y):text(y,1000)));
-  if (key==='bookmarks') return objectRows(v,strings);
+  if (key==='bookmarks') return objectRows(v,row=>Array.isArray(row)&&row.length<=20000&&row.every(id=>text(id,4096)||Number.isSafeInteger(id)&&id>=0));
   if (key==='positions') return objectRows(v,x=>fields(x,['chapter','y'])&&Number.isSafeInteger(x.chapter)&&x.chapter>=0&&Number.isFinite(x.y)&&x.y>=0);
   if (key==='reader-display') return fields(v,['size','spacing','font','light'])&&v.size>=15&&v.size<=34&&v.spacing>=1.2&&v.spacing<=2.2&&['serif','sans-serif'].includes(v.font)&&typeof v.light==='boolean';
   if (key==='music-position') return fields(v,['key','time'])&&text(v.key,4096)&&Number.isFinite(v.time)&&v.time>=0;

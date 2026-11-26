@@ -249,10 +249,11 @@ test('backup round trip validates file bytes and excludes connection settings',a
   const file=new Uint8Array([1,2,3]),hash=await (await import('../src/lib/model.js')).digest(file);
   const event=finalizeEvent({kind:1,created_at:1,tags:[],content:'test'},secret);
   const row={id:'staged:'+pubkey+':track:draft',selection:'12345678-1234-1234-1234-123456789abc',files:[{path:'track.mp3',type:'audio/mpeg',hash,bytes:file}]};
-  const bytes=await encodeBackup({events:[event],books:[],files:[row],receipts:[]},{account:pubkey,bookmarks:{}});
+  const bytes=await encodeBackup({events:[event],books:[],files:[row],receipts:[]},{account:pubkey,bookmarks:{origin:[1,'2']}});
   const restored=await decodeBackup(bytes);
   assert.deepEqual(restored.records.files[0],row);
   assert.equal(restored.records.events[0].id,event.id);
+  assert.deepEqual(restored.settings.bookmarks.origin,[1,'2']);
   assert.equal(backupSettingKey('publishing-account'),false);
   assert.equal(backupSettingKey('remote-session'),false);
   await assert.rejects(encodeBackup({events:[],books:[],files:[{...row,files:[{...row.files[0],hash:'b'.repeat(64)}]}],receipts:[]},{}),/hash mismatch/);

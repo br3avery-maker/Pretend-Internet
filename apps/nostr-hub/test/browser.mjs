@@ -550,6 +550,7 @@ try {
   assert.equal(await page.getByLabel('Stable identifier for updates').inputValue(),'a-new-story');
   await open('help.html');
   const downloadPromise=page.waitForEvent('download',{timeout:20000});
+  void downloadPromise.catch(()=>{});
   await button('Export local backup').click();
   await page.locator('main [role=status]:not([hidden])').waitFor();
   assert.match(await page.locator('main [role=status]:not([hidden])').textContent(),/Backup bytes validated/);
