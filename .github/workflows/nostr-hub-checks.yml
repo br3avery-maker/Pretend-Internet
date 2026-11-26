@@ -5,12 +5,14 @@ on:
     paths:
       - 'apps/nostr-hub/**'
       - 'tools/relay-router/**'
+      - 'tools/test-support/**'
       - '.github/workflows/nostr-hub-checks.yml'
   push:
     branches: [main]
     paths:
       - 'apps/nostr-hub/**'
       - 'tools/relay-router/**'
+      - 'tools/test-support/**'
       - '.github/workflows/nostr-hub-checks.yml'
   workflow_dispatch:
 
@@ -30,6 +32,7 @@ jobs:
           node-version: '22'
       - name: Install locked dependencies
         run: |
+          npm ci --prefix tools/test-support
           npm ci --prefix tools/relay-router
           npm ci --prefix apps/nostr-hub
       - name: Run relay-router regression tests
