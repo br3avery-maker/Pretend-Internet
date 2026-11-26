@@ -163,16 +163,17 @@ export function jobId(author, draft, files) {
 export async function publicationHistory(author, draft, files, receipts) {
   const fingerprint = await jobId(author, draft, files);
   const matching = receipts.filter(row => row.account === author && (row.fingerprint ?? row.id) === fingerprint)
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => b.createdAt - a.createdAt || (b.event?.created_at ?? 0) - (a.event?.created_at ?? 0));
   const previous = matching[0];
   const kind = draft.type === 'article' ? kinds.article : draft.type === 'track' ? kinds.track : null;
   const related = kind === null ? [] : receipts.filter(row => row.event?.pubkey === author &&
     row.event.kind === kind && tag(row.event, 'd') === draft.slug);
-  const latestTimestamp = Math.max(0, ...related.map(row => row.event.created_at));
-  const superseded = related.some(row => row.id !== previous?.id &&
-    (row.event.created_at > (previous?.event?.created_at ?? 0) || row.createdAt > (previous?.createdAt ?? 0)));
+  const latestTimestamp = [...related, ...matching].reduce((clock, row) => Math.max(clock, row.event?.created_at ?? 0), 0);
+  const nextCreatedAt = receipts.reduce((clock, row) => Math.max(clock, (row.createdAt ?? 0) + 1), Date.now());
+  const superseded = previous && related.some(row => row.id !== previous.id &&
+    ((previous.event && row.event.created_at > previous.event.created_at) || row.createdAt > previous.createdAt));
   return { previous: previous?.status !== 'verified' && !superseded ? previous : undefined,
-    completed: previous?.status === 'verified' ? previous : undefined, latestTimestamp };
+    completed: previous?.status === 'verified' ? previous : undefined, latestTimestamp, nextCreatedAt };
 }
 function blobServers(draft, plan) {
   return siteServers([draft.server, ...(draft.site?.servers ?? []), ...[plan?.source, plan?.current].filter(Boolean)
@@ -180,13 +181,13 @@ function blobServers(draft, plan) {
 }
 
 export async function execute({ draft, files, signer, transport, previous, checkpoint, upload = uploadVerified,
-  known, backup, latestTimestamp = 0, verifyFiles = verifySavedFiles }) {
+  known, backup, latestTimestamp = 0, nextCreatedAt = Date.now(), verifyFiles = verifySavedFiles }) {
   verifyReview(draft, files);
   const plan = draft.site ? planSite(draft.site, signer.pubkey, files, backup) : null;
   const fingerprint = await jobId(signer.pubkey, draft, files);
   const retry = previous && previous.status !== 'verified' && (previous.fingerprint ?? previous.id) === fingerprint;
   const job = retry ? structuredClone(previous) : {
-    id: crypto.randomUUID(), fingerprint, account: signer.pubkey, type: draft.type, title: draft.title, createdAt: Date.now(), status: 'reviewed', uploads: {}, attempts: [],
+    id: crypto.randomUUID(), fingerprint, account: signer.pubkey, type: draft.type, title: draft.title, createdAt: nextCreatedAt, status: 'reviewed', uploads: {}, attempts: [],
   };
   const sign = async value => checkSignature(value, await signer.sign(structuredClone(value)), signer.pubkey);
   const verifyHead = async () => assertHeads(

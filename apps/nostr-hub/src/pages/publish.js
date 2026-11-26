@@ -248,7 +248,7 @@ export async function render(main) {
       const queued = async lock => {
         if (!lock) throw new Error('A publication is already in progress in another tab.');
         const history = await publicationHistory(selectedSigner.pubkey, selection, snapshot, await all('receipts'));
-        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, previous: history.previous, latestTimestamp: history.latestTimestamp, known: prepared?.known, backup: prepared?.backup,
+        const job = await execute({ draft: selection, files: snapshot, signer: selectedSigner, transport, previous: history.previous, latestTimestamp: history.latestTimestamp, nextCreatedAt: history.nextCreatedAt, known: prepared?.known, backup: prepared?.backup,
           checkpoint: async value => { await put('receipts', value); setStatus(progress, value.status === 'uploading' ? 'Verified a Blossom upload.' : value.status === 'signed' ? 'Signed. Checking relay acceptance and readback.' : value.status); } });
         if (prepared && job.attempts.some(row => row.verified)) await put('events', job.event);
         await showReceipts();

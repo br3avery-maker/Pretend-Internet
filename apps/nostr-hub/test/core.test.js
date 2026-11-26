@@ -130,7 +130,7 @@ test('completed article operations are immutable and A-B-A creates a newer signe
   async function publish(body) {
     const reviewed = { ...draft, body };
     const history = await publicationHistory(signer.pubkey, reviewed, [], [...receipts.values()]);
-    return execute({ draft: reviewed, files: [], signer, previous: history.previous, latestTimestamp: history.latestTimestamp,
+    return execute({ draft: reviewed, files: [], signer, previous: history.previous, latestTimestamp: history.latestTimestamp, nextCreatedAt: history.nextCreatedAt,
       checkpoint: async row => receipts.set(row.id, structuredClone(row)),
       transport: { async publish() { return { accepted: true, verified: available, code: 'accepted' }; } } });
   }
@@ -150,4 +150,16 @@ test('completed article operations are immutable and A-B-A creates a newer signe
   assert.equal(receipts.size, 3);
   assert.deepEqual(receipts.get(a.id), a);
   assert.deepEqual(receipts.get(b.id), b);
+});
+
+
+test('an interrupted upload can resume even after an older completed publication of that address', async () => {
+  const draft = { type: 'track', slug: 'track', title: 'New', body: '', artist: 'Artist', relays: ['wss://relay.fixture.example'] };
+  const fingerprint = await (await import('../src/lib/publisher.js')).jobId(author, draft, []);
+  const old = { id: 'old', account: author, status: 'verified', createdAt: 10,
+    event: { pubkey: author, kind: 36787, tags: [['d','track']], created_at: 1 } };
+  const pending = { id: 'pending', fingerprint, account: author, status: 'uploading', createdAt: 20 };
+  const history = await publicationHistory(author, draft, [], [old, pending]);
+  assert.equal(history.previous.id, 'pending');
+  assert.equal(history.latestTimestamp, 1);
 });
