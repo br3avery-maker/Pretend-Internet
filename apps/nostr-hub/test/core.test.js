@@ -187,3 +187,31 @@ test('signed public mute lists isolate owners, retain safe exceptions, and requi
   assert.equal(visibility({...site,tags:[['description','Independent web researcher studying telescope optics.']]},{mutes}),'');
   assert.equal(visibility({kind:30023,pubkey:foreign,tags:[],id:'f'.repeat(64)},{mutes}),'Public signed mute list');
 });
+
+
+test('Blossom fallback is limited to reviewed destinations and never bypasses signer refusal', async () => {
+  const key = generateSecretKey(), pubkey = getPublicKey(key);
+  const primary = 'https://primary.fixture.example', fallback = 'https://fallback.fixture.example';
+  const file = {path:'track.mp3',type:'audio/mpeg',hash:'a'.repeat(64),bytes:new Uint8Array([1])};
+  const draft = {type:'track',title:'Track',slug:'track',artist:'Artist',body:'',server:primary,fallbackServers:[fallback],relays:['wss://relay.fixture.example']};
+  const calls = [];
+  const signer = {pubkey,sign:async value => finalizeEvent(value,key)};
+  const transport = {async publish(){return {accepted:true,verified:true,code:'accepted'}}};
+  const options = {draft,files:[file],signer,transport,checkpoint:async()=>{},
+    upload:async (row,server,approve) => {
+      calls.push(server);
+      const auth = await approve({kind:24242,created_at:1,content:'',tags:[['server',new URL(server).host]]});
+      assert.equal(auth.tags[0][1],new URL(server).host);
+      if (server === primary) throw Error('Unavailable');
+      return server + '/' + row.hash;
+    }};
+  const receipt = await execute(options);
+  assert.deepEqual(calls,[primary,fallback]);
+  assert.equal(receipt.uploadServers[file.hash],fallback);
+  assert.equal(receipt.event.tags.find(row=>row[0]==='url')[1],fallback+'/'+file.hash);
+  assert.equal(receipt.status,'verified');
+  calls.length=0;
+  await assert.rejects(execute({...options,signer:{pubkey,sign:async()=>{throw Error('Denied')}}}),/Denied/);
+  assert.deepEqual(calls,[primary]);
+  await assert.rejects(execute({...options,draft:{...draft,fallbackServers:['http://localhost']}}),/distinct public HTTPS/);
+});

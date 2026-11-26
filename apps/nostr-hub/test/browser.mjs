@@ -124,6 +124,12 @@ await context.routeWebSocket(/^wss:\/\//, connection => {
   });
 });
 const blobMap = new Map();
+let failedPrimary = 0;
+await context.route('https://blossom.primal.net/**', async request => {
+  if (request.request().method() === 'OPTIONS') return request.fulfill({status:204,headers:{'access-control-allow-origin':'*','access-control-allow-methods':'PUT,GET,OPTIONS','access-control-allow-headers':'*'}});
+  if (request.request().method() === 'PUT') failedPrimary++;
+  return request.fulfill({status:503,headers:{'access-control-allow-origin':'*'},body:'Fixture unavailable'});
+});
 await context.route('https://blossom.fixture.example/**', async request => {
   const req = request.request();
   const path = new URL(req.url()).pathname;
@@ -372,8 +378,10 @@ try {
   await siteFile.setInputFiles({name:'site.zip',mimeType:'application/zip',
     buffer:Buffer.from(zipSync({'index.html':newSite,'style.css':style,'assets/logo.svg':logo}))});
   await page.getByText(/3 staged files/).waitFor();
-  await page.getByLabel('Blossom server').selectOption('https://blossom.fixture.example');
+  await page.getByLabel('Blossom server').selectOption('https://blossom.primal.net');
+  await page.locator('input[type=checkbox][value="https://blossom.fixture.example"]').check();
   await button('Review publication').click();
+  await review.getByText('Approved fallback upload destinations, in order:').waitFor();
   await page.getByRole('dialog',{name:'Review public publication'}).waitFor();
   assert.equal(writes.length,0,'Review does not publish');
   assert.equal(uploads,0,'Review does not upload');
@@ -384,6 +392,8 @@ try {
   assert.equal(writes.length,1);
   assert.equal(writes[0].kind,35128);
   assert.equal(uploads,3);
+  assert.equal(failedPrimary,1);
+  assert.ok(writes[0].tags.some(row => row[0]==='server' && row[1]==='https://blossom.fixture.example'));
   assert.ok(authentications >= 2);
   assert.ok(authenticatedAddressReads >= 2, 'Authenticated nsite address preflight and readback');
   assert.ok([...blobMap.values()].some(data => data.equals(newSite)));

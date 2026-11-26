@@ -18,6 +18,8 @@ Use the profile menu to sign in with the account you intend to use. The app reme
 
 **Create new nsite** accepts a static folder, ZIP, HTML file, Markdown, or text. It suggests a title and identifier and reads a description from HTML metadata. Markdown and text become a static page. Choose a named address or your account’s root address. The app blocks creation when it finds a publication at the same address on the checked relays.
 
+Blossom upload fallback is optional: select up to two additional destinations, review the ordered list before signing, and retry only those destinations when a file cannot be verified. Signer refusal stops the operation. Receipts record verified and failed upload attempts without storing authorization signatures.
+
 **Update existing nsite** starts from an owned signed manifest. A file or ZIP of changes adds or replaces those paths. Other paths stay in the manifest. Removal requires selecting the paths and confirming the changes. Review shows the full publishing npub, site address, current event ID, and file changes. The app checks the current manifest again before sending and verifies that its new signed event is the current version on selected relays.
 
 **Restore a saved version** republishes a signed baseline from this device at the original address. The files must still be retrievable by hash from Blossom. A publication receipt covers the verified Blossom files and relay version. Gateways can cache a previous version. The app does not control their cache or check every public relay.

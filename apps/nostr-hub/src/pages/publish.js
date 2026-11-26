@@ -26,6 +26,7 @@ function receiptPanel(job) {
   const detail = el('details', { class: 'entry' }, el('summary', {}, `${job.title || typeNames[job.type]} · ${results[job.status] || job.status}`),
     job.event && el('p', {}, el('code', {}, job.event.id)),
     el('p', {}, `${Object.keys(job.uploads).length} verified Blossom files`),
+    job.uploadAttempts?.length > 0 && el('ul', { class: 'stack-tight' }, job.uploadAttempts.map(row => el('li', {}, el('code', {}, row.server), ' · ', row.status, ' · ', row.hash.slice(0, 12)))),
     job.attempts.length > 0 && el('ul', { class: 'stack-tight' }, job.attempts.map(row =>
       el('li', {}, el('code', {}, row.url), ' · ', row.verified ? 'Verified' : row.accepted ? 'Accepted' : row.code))),
     el('div', { class: 'row' }, copy, job.url && job.attempts.some(row => row.verified) &&
@@ -57,6 +58,7 @@ export async function render(main) {
   const destinations = el('div', { class: 'stack-tight' });
   const server = el('select');
   const serverField = label('Blossom server', server);
+  const fallbackFields = el('div', { class: 'stack-tight' });
   const formMessage = status();
   const receipts = el('section', { class: 'stack-tight' });
   const reviewBtn = el('button', { class: 'primary' }, 'Review publication');
@@ -82,9 +84,21 @@ export async function render(main) {
     const servers = endpoints([...setting('blossom', []), ...blossom, defaultBlossom], true).slice(0, 12);
     server.replaceChildren(...servers.map(url => el('option', { value: url }, url)));
     if (servers.includes(saved.server)) server.value = saved.server;
+    fallbackFields.replaceChildren(el('h3', {}, 'Optional Blossom fallback'), muted('Select up to two servers to receive files if the primary cannot verify an upload.'), ...servers.map(url =>
+      el('label', { class: 'check' }, el('input', { type: 'checkbox', value: url, checked: (saved.fallbackServers ?? []).includes(url) }), el('code', {}, url))));
+    syncFallbacks();
   }
+  function syncFallbacks() {
+    for (const input of fallbackFields.querySelectorAll('input')) {
+      input.disabled = input.value === server.value;
+      if (input.disabled) input.checked = false;
+    }
+  }
+  server.addEventListener('input', syncFallbacks);
+  const fallbackServers = () => [...fallbackFields.querySelectorAll('input:checked:not(:disabled)')].map(node => node.value);
   const collect = () => ({ type: type.value, title: title.value.trim(), slug: type.value === 'nsite' ? editor.slug() : identifier.value.trim(), body: text.value.trim(), artist: artist.value.trim(),
     server: serverField.hidden ? '' : server.value,
+    ...(!serverField.hidden && fallbackServers().length ? { fallbackServers: fallbackServers() } : {}),
     relays: [...destinations.querySelectorAll('input:checked')].map(node => node.value) });
   function saveDraft() {
     setSetting('draft-type', type.value);
@@ -111,6 +125,7 @@ export async function render(main) {
     siteInput.accept = editor.creating() ? '.html,.htm,.zip,.md,.txt' : '';
     mediaFields.hidden = value !== 'track';
     serverField.hidden = !['track', 'nsite'].includes(value);
+    fallbackFields.hidden = serverField.hidden;
     const defaults = isSite ? editor.defaults() : {};
     title.value = saved.title ?? defaults.title ?? '';
     identifier.value = isSite && !editor.creating() ? editor.slug() : saved.slug ?? '';
@@ -190,7 +205,7 @@ export async function render(main) {
   }
   const form = el('form', {},
     label('Publication type', type), editor.node, titleField, identifierField, artistField, textField,
-    mediaFields, siteFields, fileMessage, serverField, destinations, reviewBtn, formMessage);
+    mediaFields, siteFields, fileMessage, serverField, fallbackFields, destinations, reviewBtn, formMessage);
   type.value = query.has('site') ? 'nsite' : setting('draft-type', 'note');
   if (!type.value) type.value = 'note';
   type.addEventListener('change', () => { setSetting('draft-type', type.value); void applyType(); });
@@ -229,6 +244,7 @@ export async function render(main) {
       prepared?.plan.current && el('p', {}, 'Current signed version ', el('code', {}, prepared.plan.current.id)),
       selection.body && el('div', { class: 'inline-preview' }, selection.body),
       selection.server && count > 0 && el('p', {}, count + ' files will be uploaded to ', el('code', {}, selection.server)),
+      selection.fallbackServers?.length && count > 0 && el('div', {}, el('p', {}, 'Approved fallback upload destinations, in order:'), el('ol', {}, selection.fallbackServers.map(url => el('li', {}, el('code', {}, url))))),
       prepared && el('details', { open: prepared.plan.changes.length <= 12 ? '' : null }, el('summary', {}, 'File changes'),
         el('ul', {}, prepared.plan.changes.map(file => el('li', {}, file.action + ' ' + file.path,
           file.hash && ['Add', 'Change'].includes(file.action) && [' · ', el('code', {}, file.hash)])))),

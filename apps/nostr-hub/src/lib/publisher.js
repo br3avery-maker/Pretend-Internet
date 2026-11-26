@@ -115,7 +115,7 @@ export async function uploadVerified(file, server, sign, fetcher = fetch) {
   if (offset !== file.bytes.length || await digest(bytes) !== file.hash) throw new Error('The retrieved Blossom file differs from the selected file.');
   return url;
 }
-export async function template(draft, files, urls, clock = now(), plan) {
+export async function template(draft, files, urls, clock = now(), plan, usedServers = []) {
   if (draft.type === 'nsite') {
     const source = plan?.source;
     const paths = plan ? [...plan.paths.values()] : files;
@@ -125,7 +125,7 @@ export async function template(draft, files, urls, clock = now(), plan) {
       kind: draft.site?.root ? kinds.root : kinds.site, created_at: clock, content: source?.content ?? '',
       tags: [...(draft.site?.root ? [] : [['d', draft.slug]]), ['title', draft.title], ['description', draft.body],
         ...paths.map(file => file.parts ?? ['path', file.path, file.hash]), ['x', await aggregate(paths), 'aggregate'],
-        ...blobServers(draft, plan).map(server => ['server', server]), ...preserved],
+        ...blobServers(draft, plan, usedServers).map(server => ['server', server]), ...preserved],
     };
   }
   if (draft.type === 'track') {
@@ -144,6 +144,14 @@ export async function template(draft, files, urls, clock = now(), plan) {
   }
   return { kind: kinds.note, created_at: clock, content: draft.body, tags: [] };
 }
+function uploadDestinations(draft) {
+  const fallbacks = draft.fallbackServers ?? [];
+  if (!Array.isArray(fallbacks) || fallbacks.length > 2 || !draft.server) throw new Error('Review one primary Blossom server and at most two fallbacks.');
+  const requested = [draft.server, ...fallbacks];
+  const normalized = siteServers(requested);
+  if (normalized.length !== requested.length || normalized.some((url,i) => url !== requested[i])) throw new Error('Review distinct public HTTPS Blossom destinations.');
+  return normalized;
+}
 export function verifyReview(draft, files) {
   if (!['note', 'article', 'track', 'nsite'].includes(draft.type)) throw new Error('Choose a publication type.');
   if (!draft.relays.length) throw new Error('Choose at least one reviewed relay.');
@@ -152,7 +160,7 @@ export function verifyReview(draft, files) {
     throw new Error('Review the exact nsite address before publishing.');
   }
   if (draft.type === 'track' && (!draft.artist || !files[0]?.type.startsWith('audio/'))) throw new Error('Add an artist and an audio file before reviewing this release.');
-  if (['track', 'nsite'].includes(draft.type) && !draft.server) throw new Error('Choose a Blossom server for the selected files.');
+  if (['track', 'nsite'].includes(draft.type)) uploadDestinations(draft);
   if (['article', 'note'].includes(draft.type) && !draft.body) throw new Error('Write something before reviewing.');
   if (files.some(file => !hex.test(file.hash))) throw new Error('A file digest is missing.');
 }
@@ -175,8 +183,8 @@ export async function publicationHistory(author, draft, files, receipts) {
   return { previous: previous?.status !== 'verified' && !superseded ? previous : undefined,
     completed: previous?.status === 'verified' ? previous : undefined, latestTimestamp, nextCreatedAt };
 }
-function blobServers(draft, plan) {
-  return siteServers([draft.server, ...(draft.site?.servers ?? []), ...[plan?.source, plan?.current].filter(Boolean)
+function blobServers(draft, plan, usedServers = []) {
+  return siteServers([draft.server, ...usedServers, ...(draft.site?.servers ?? []), ...[plan?.source, plan?.current].filter(Boolean)
     .flatMap(event => tags(event, 'server').map(parts => parts[1]))]);
 }
 
@@ -195,29 +203,55 @@ export async function execute({ draft, files, signer, transport, previous, check
   );
   if (plan) {
     await verifyHead();
-    await verifyFiles([...plan.paths.values()].filter(file => !file.bytes || job.uploads[file.hash]), blobServers(draft, plan));
+    await verifyFiles([...plan.paths.values()].filter(file => !file.bytes || job.uploads[file.hash]), blobServers(draft, plan, Object.values(job.uploadServers ?? {})));
     job.address = [draft.site.root ? kinds.root : kinds.site, signer.pubkey, draft.slug].join(':');
     job.baseline = plan.current;
     job.action = draft.site.mode;
   }
   const pending = (plan?.uploads ?? files).filter(file => !job.uploads[file.hash]);
+  const targets = pending.length ? uploadDestinations(draft) : [];
+  job.uploadServers ??= {};
+  job.uploadAttempts ??= [];
   for (let offset = 0; offset < pending.length; offset += 32) {
     const batch = pending.slice(offset, offset + 32);
-    let authorized;
-    const approve = async request => {
-      if (batch.length === 1) return sign(request);
-      if (!authorized || now() + 25 >= Number(tag(authorized, 'expiration'))) authorized = await sign(uploadAuth(batch, draft.server));
-      return authorized;
-    };
+    const authorized = new Map();
+    const unavailable = new Set();
     for (const file of batch) {
       if (job.uploads[file.hash]) continue;
-      job.uploads[file.hash] = await upload(file, draft.server, approve);
-      job.status = 'uploading';
-      await checkpoint(job);
+      for (const server of targets) {
+        if (unavailable.has(server)) continue;
+        let signerFailed = false;
+        const approve = async request => {
+          try {
+            if (batch.length === 1) return await sign(request);
+            const token = authorized.get(server);
+            if (token && now() + 25 < Number(tag(token, 'expiration'))) return token;
+            const next = await sign(uploadAuth(batch, server));
+            authorized.set(server, next);
+            return next;
+          } catch (error) { signerFailed = true; throw error; }
+        };
+        let url;
+        try { url = await upload(file, server, approve); }
+        catch (error) {
+          if (signerFailed) throw error;
+          unavailable.add(server);
+          job.uploadAttempts.push({ hash: file.hash, server, status: 'failed' });
+          await checkpoint(job);
+          continue;
+        }
+        job.uploads[file.hash] = url;
+        job.uploadServers[file.hash] = server;
+        job.uploadAttempts.push({ hash: file.hash, server, status: 'verified' });
+        job.status = 'uploading';
+        await checkpoint(job);
+        break;
+      }
+      if (!job.uploads[file.hash]) throw new Error('Reviewed Blossom destinations could not verify ' + file.path + '. No manifest was sent.');
     }
   }
   const unsigned = await template(draft, files, job.uploads,
-    job.event?.created_at ?? Math.max(now(), latestTimestamp + 1, (plan?.current?.created_at ?? 0) + 1, (previous?.status === 'verified' ? previous.event?.created_at ?? 0 : 0) + 1), plan);
+    job.event?.created_at ?? Math.max(now(), latestTimestamp + 1, (plan?.current?.created_at ?? 0) + 1, (previous?.status === 'verified' ? previous.event?.created_at ?? 0 : 0) + 1), plan, Object.values(job.uploadServers));
   job.event = job.event ? checkSignature(unsigned, job.event, signer.pubkey) : await sign(unsigned);
   job.status = 'signed';
   await checkpoint(job);
