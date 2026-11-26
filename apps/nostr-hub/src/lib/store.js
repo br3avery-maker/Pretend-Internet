@@ -120,3 +120,75 @@ export async function cachedEvents(kinds,author='') {
     tx.onerror=tx.onabort=()=>reject(tx.error);
   });
 }
+
+// A single read transaction gives a consistent local record snapshot. Connections
+// and their wrapping keys are deliberately not among the portable stores.
+const portableStores=['events','books','files','receipts'];
+export async function backupSnapshot() {
+  const db=await database();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(portableStores,'readonly');
+    const requests=portableStores.map(name=>[name,tx.objectStore(name).getAll()]);
+    tx.oncomplete=()=>resolve(Object.fromEntries(requests.map(([name,r])=>[name,r.result])));
+    tx.onerror=tx.onabort=()=>reject(tx.error);
+  });
+}
+export function localBackupSettings(allowed) {
+  const values=Object.create(null);
+  for(let i=0;i<localStorage.length;i++){
+    const name=localStorage.key(i);
+    if(name?.startsWith(prefix)&&allowed(name.slice(prefix.length)))values[name.slice(prefix.length)]=JSON.parse(localStorage.getItem(name));
+  }
+  return values;
+}
+export function restoreBackupSettings(values,equal) {
+  const added=[];
+  const rollback=()=>{for(const key of added)localStorage.removeItem(prefix+key);};
+  for(const [key,value] of Object.entries(values)){
+    const raw=localStorage.getItem(prefix+key);
+    if(raw!==null&&!equal(JSON.parse(raw),value))throw Error('Backup conflicts with existing setting: '+key+'. Nothing overwritten.');
+  }
+  try {
+    for(const [key,value] of Object.entries(values))if(localStorage.getItem(prefix+key)===null){
+      setSetting(key,value);added.push(key);
+    }
+  }catch(error){rollback();throw error;}
+  return rollback;
+}
+export async function restoreBackupRecords(records,equal) {
+  const db=await database();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction([...portableStores,'cache-meta'],'readwrite');
+    const meta=tx.objectStore('cache-meta');
+    let failure;
+    const requests=portableStores.map(name=>[name,tx.objectStore(name).getAll()]);
+    const usage=meta.get('events');
+    let pending=requests.length+1;
+    const ready=()=>{
+      if(--pending)return;
+      try{
+        const next={...usage.result};
+        for(const [name,request] of requests){
+          const existing=new Map(request.result.map(row=>[row.id,row]));
+          for(const row of records[name]){
+            if(existing.has(row.id)){
+              if(!equal(existing.get(row.id),row))throw Error('Backup conflicts with existing '+name+' record: '+row.id+'. Nothing overwritten.');
+              continue;
+            }
+            if(name==='events'){
+              const bytes=eventBytes(row);
+              if(!fitsEventCache(next,bytes))throw Error('Backup exceeds remaining signed-event cache capacity.');
+              next.bytes+=bytes;next.count++;
+            }
+            tx.objectStore(name).add(row);
+          }
+        }
+        meta.put(next);
+      }catch(error){failure=error;tx.abort();}
+    };
+    for(const [,request] of requests)request.onsuccess=ready;
+    usage.onsuccess=ready;
+    tx.oncomplete=()=>resolve();
+    tx.onerror=tx.onabort=()=>reject(failure??tx.error??Error('Restore transaction aborted.'));
+  });
+}

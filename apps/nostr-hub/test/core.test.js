@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { zipSync, strToU8 } from 'fflate';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { encodeBackup, decodeBackup, backupSettingKey } from '../src/lib/backup.js';
 import { advanceCoverage, publicationRouter } from '../src/lib/nostr.js';
 import { fitsEventCache, eventCacheLimits } from '../src/lib/store.js';
 import { publicMutes, visibility } from '../src/lib/moderation.js';
@@ -240,4 +241,20 @@ test('publication router inspects only reviewed relays and records incompatible 
   assert.ok(plan.excluded.some(row=>row.url===relay&&row.reasons.includes('content-size')));
   assert.ok(seen.length>0 && seen.every(url=>url===relay || url==='https://reviewed.fixture.example/'));
   assert.ok(!seen.includes(other));
+});
+
+
+test('backup round trip validates file bytes and excludes connection settings',async()=>{
+  const secret=generateSecretKey(),pubkey=getPublicKey(secret);
+  const file=new Uint8Array([1,2,3]),hash=await (await import('../src/lib/model.js')).digest(file);
+  const event=finalizeEvent({kind:1,created_at:1,tags:[],content:'test'},secret);
+  const row={id:'staged:'+pubkey+':track:draft',selection:'12345678-1234-1234-1234-123456789abc',files:[{path:'track.mp3',type:'audio/mpeg',hash,bytes:file}]};
+  const bytes=await encodeBackup({events:[event],books:[],files:[row],receipts:[]},{account:pubkey,bookmarks:{}});
+  const restored=await decodeBackup(bytes);
+  assert.deepEqual(restored.records.files[0],row);
+  assert.equal(restored.records.events[0].id,event.id);
+  assert.equal(backupSettingKey('publishing-account'),false);
+  assert.equal(backupSettingKey('remote-session'),false);
+  await assert.rejects(encodeBackup({events:[],books:[],files:[{...row,files:[{...row.files[0],hash:'b'.repeat(64)}]}],receipts:[]},{}),/hash mismatch/);
+  await assert.rejects(encodeBackup({events:[],books:[],files:[],receipts:[]},{'publishing-account':{pubkey}}),/nonportable/);
 });

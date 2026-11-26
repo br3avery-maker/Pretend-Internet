@@ -172,7 +172,7 @@ export async function publicationHistory(author, draft, files, receipts) {
   const fingerprint = await jobId(author, draft, files);
   const matching = receipts.filter(row => row.account === author && (row.fingerprint ?? row.id) === fingerprint)
     .sort((a, b) => b.createdAt - a.createdAt || (b.event?.created_at ?? 0) - (a.event?.created_at ?? 0));
-  const previous = matching[0];
+  const previous = matching.find(row=>!row.recovered);
   const kind = draft.type === 'article' ? kinds.article : draft.type === 'track' ? kinds.track : null;
   const related = kind === null ? [] : receipts.filter(row => row.event?.pubkey === author &&
     row.event.kind === kind && tag(row.event, 'd') === draft.slug);
@@ -193,7 +193,7 @@ export async function execute({ draft, files, signer, transport, previous, check
   verifyReview(draft, files);
   const plan = draft.site ? planSite(draft.site, signer.pubkey, files, backup) : null;
   const fingerprint = await jobId(signer.pubkey, draft, files);
-  const retry = previous && previous.status !== 'verified' && (previous.fingerprint ?? previous.id) === fingerprint;
+  const retry = previous && !previous.recovered && previous.status !== 'verified' && (previous.fingerprint ?? previous.id) === fingerprint;
   const job = retry ? structuredClone(previous) : {
     id: crypto.randomUUID(), fingerprint, account: signer.pubkey, type: draft.type, title: draft.title, createdAt: nextCreatedAt, status: 'reviewed', uploads: {}, attempts: [],
   };

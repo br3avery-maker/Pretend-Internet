@@ -24,6 +24,7 @@ function receiptPanel(job) {
     setTimeout(() => URL.revokeObjectURL(blob), 1000);
   });
   const detail = el('details', { class: 'entry' }, el('summary', {}, `${job.title || typeNames[job.type]} · ${results[job.status] || job.status}`),
+    job.recovered && muted('Imported historical receipt; current delivery has not been independently reverified.'),
     job.event && el('p', {}, el('code', {}, job.event.id)),
     el('p', {}, `${Object.keys(job.uploads).length} verified Blossom files`),
     job.relayPlan && el('details', {}, el('summary', {}, 'Relay routing evidence'), el('pre', {}, JSON.stringify(job.relayPlan,null,2))),

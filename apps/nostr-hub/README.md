@@ -72,3 +72,7 @@ The browser suite serves the built app over loopback and exercises simulated pub
 | Remaining device evidence | Android installation, Amber handoff on a phone, and real public publish delivery have yet to be exercised for this build. |
 
 For the configured Android-builder package, see [WebToApp import](webtoapp/README.md).
+
+### Local recovery
+
+Help → Backup and restore exports a versioned ZIP (128 MiB uncompressed maximum) with local books, staged file bytes, signed metadata, non-secret settings and historic publication receipts. Import validates signatures, blob hashes and structure, adds only missing records, rejects conflicting records/settings, and verifies readback. Reconnect the signer separately; connection records and publishing-account settings are excluded. Imported receipts are historical evidence, not automatic retry authorization. Keep backups private. Close other app tabs before restoring.
