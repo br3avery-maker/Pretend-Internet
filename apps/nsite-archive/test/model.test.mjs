@@ -46,3 +46,17 @@ test('restoration ZIP preserves prototype names, Unicode and exact bytes',async(
  }
  assert.equal(expected.size,0);
 });
+
+test('imported preview values must be renderable PNG data URLs before they reach HTML',()=>{
+ const b=fixtureBundle(),v=b.stores.versions[0];
+ const hash=buildCatalog(b.stores.versions,[],b.stores.jobs,[]).sites.find(s=>s.id===v.site).nativeHash;
+ const previewOf=image=>buildCatalog(b.stores.versions,[],b.stores.jobs,[{id:'preview:'+hash,image}]).sites.find(s=>s.id===v.site).preview;
+ const valid='data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==';
+ assert.equal(previewOf(valid),valid);
+ for(const hostile of [
+   'data:image/png;base64,AAAA" onerror="globalThis.archiveXss=true',
+   'javascript:alert(1)',
+   'data:image/svg+xml;base64,PHN2Zz4=',
+   'data:image/png;base64,'+'A'.repeat(2500001),
+ ]) assert.equal(previewOf(hostile),null);
+});

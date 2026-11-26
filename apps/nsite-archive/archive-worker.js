@@ -1,5 +1,5 @@
 import * as engine from './vendor/archive-engine.js';
-import { buildCatalog,listCatalog,materialize,diffFiles } from './model.js';
+import { buildCatalog,listCatalog,materialize,diffFiles,safePreview } from './model.js';
 import {indexArchive} from './indexer.js';
 import {safePage} from './safe-page.js';
 import {CONTROL,updateControl} from './collector.js';
@@ -48,7 +48,7 @@ const handlers={
     }
     const deployments=cat.sites.filter(s=>!s.excluded&&s.nativeHash===v.nativeHash).map(({search,...s})=>s);
     const primary=files.filter(f=>f.page).sort((a,b)=>Number(!/^\/index\.html?$/i.test(a.path))-Number(!/^\/index\.html?$/i.test(b.path)))[0]?.page;
-    const selectedSummary={...summary,title:v.published?.title||primary?.title||summary.title,description:v.published?.description||primary?.description||summary.description,preview:cat.settingMap.get('preview:'+v.nativeHash)?.image||null};
+    const selectedSummary={...summary,title:v.published?.title||primary?.title||summary.title,description:v.published?.description||primary?.description||summary.description,preview:safePreview(cat.settingMap.get('preview:'+v.nativeHash)?.image)};
     return {summary:selectedSummary,version:v,files,related,relationships,deployments,history:all.map(x=>({id:x.id,created:x.event.created_at,legacy:x.legacy})),hidden:summary.hidden};
   },
   async collectionState(){return (await (await open()).get('settings',CONTROL))||{id:CONTROL,running:false};},
@@ -110,7 +110,11 @@ const handlers={
   });},
   async exportArchive() {return write(async()=>({name:'nsite-archive.json',blob:await engine.exportArchive(await open())}));},
   async importArchive({file}) {return write(async()=>{
-    const d=await open(),result=await engine.importArchive(d,file);const control=await d.get('settings',CONTROL);if(control)await d.put('settings',{...control,running:false});
+    const d=await open(),result=await engine.importArchive(d,file);
+    // Imported settings are untrusted: drop preview values the renderer could
+    // not have produced, so a crafted backup cannot reach an HTML attribute.
+    for(const s of await d.getAll('settings'))if(s.id.startsWith('preview:')&&s.image!==undefined&&!safePreview(s.image))await d.delete('settings',s.id);
+    const control=await d.get('settings',CONTROL);if(control)await d.put('settings',{...control,running:false});
     progress('Rebuilding searchable text from verified files…');await indexArchive(d,{retry:true});return result;
   });},
   async index(args={}) {return write(()=>open().then(d=>indexArchive(d,{...args,retry:true,onProgress:v=>progress('Reading '+v.path+'…')})));},

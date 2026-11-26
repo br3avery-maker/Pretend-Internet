@@ -1,6 +1,10 @@
 import { aggregate } from './vendor/archive-engine.js';
 import { campaignMatch } from './campaign.js';
 
+// Preview images can arrive through full-archive import as well as savePreview,
+// so every reader validates the value instead of trusting stored settings.
+export const safePreview = value => typeof value === 'string' && value.length <= 2500000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value) ? value : null;
+
 export const newest = (a,b) => b.event.created_at-a.event.created_at || a.id.localeCompare(b.id);
 const key = f => `${f.hash}\n${f.path}`;
 
@@ -33,7 +37,7 @@ export function buildCatalog(records, pages, jobs, settings) {
     const verified=latest.files.filter(f=>jobMap.get(f.hash)?.state==='complete').length;
     const indexed=derived.length,needsIndex=latest.files.some(f=>/\.(html?|txt)$/i.test(f.path));
     const complete=verified===latest.files.length&&(!needsIndex||indexed>0);
-    const preview=settingMap.get('preview:'+latest.nativeHash)?.image||null;
+    const preview=safePreview(settingMap.get('preview:'+latest.nativeHash)?.image);
     sites.push({ id,publisher:latest.event.pubkey,title,description,
       complete,indexed,preview,subjects:[...new Set(derived.flatMap(p=>p.data?.subjects?.map(x=>x.value)||[]))].slice(0,8),created:latest.event.created_at,versions:versions.length,files:latest.files.length,nativeHash:latest.nativeHash,
       verified,
