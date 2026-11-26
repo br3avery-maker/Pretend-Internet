@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "0.1",
+  "id": "nsite-directory",
+  "name": "Nsite Directory",
+  "version": "0.1.0",
+  "status": "testing",
+  "summary": "Offline metadata-only Nsite directory and NIP-01 canonical SHA-256 event inspector with zero remote site fetching.",
+  "entry": "index.html",
+  "offline": true,
+  "storage": "localStorage",
+  "permissions": [],
+  "help": {
+    "purpose": "Inspect Nostr nsite event metadata, verify canonical SHA-256 event IDs, group manifest versions, and check NIP-65 relay lists without downloading remote websites.",
+    "start": "Import a Nostr event JSON/NDJSON file, paste event JSON, or click Load synthetic fixture.",
+    "limitations": "Performs structural and canonical SHA-256 ID checks only (does not verify BIP-340 cryptographic signatures); makes zero network requests; leaves sparse metadata classified as unknown; browser-tested only.",
+    "data": "Loaded event JSON stays in browser localStorage on this device until cleared. Nothing is fetched or published."
+  }
+}

@@ -25,11 +25,32 @@ if [ -e dist/old-build-only.txt ]; then
 fi
 
 # Exact expected runtime asset set; no more, no fewer.
-expected='dist/index.html
+expected='dist/apps/folder-launcher/web2app/index.html
+dist/apps/nsite-directory/app.json
+dist/apps/nsite-directory/directory-core.mjs
+dist/apps/nsite-directory/index.html
+dist/apps/nsite-directory/skin.css
+dist/apps/pocket-notes/app.json
+dist/apps/pocket-notes/index.html
+dist/apps/pocket-notes/notes-core.mjs
+dist/apps/pocket-notes/skin.css
+dist/apps/pocket-reader/app.json
+dist/apps/pocket-reader/index.html
+dist/apps/pocket-reader/reader-core.mjs
+dist/apps/pocket-reader/skin.css
+dist/index.html
+dist/portal-core.mjs
 dist/templates/mini-app/app.json
 dist/templates/mini-app/index.html
 dist/templates/mini-app/skin.css'
-actual="$(cd dist && find . -type f | sed 's|^\./|dist/|' | sort)"
+# The standalone archive build owns its runtime asset set.
+test -f apps/nsite-archive/dist/index.html
+expected="$( {
+  printf '%s\n' "$expected"
+  cd apps/nsite-archive/dist
+  find . -type f | sed 's|^\./|dist/apps/nsite-archive/|'
+} | LC_ALL=C sort)"
+actual="$(cd dist && find . -type f | sed 's|^\./|dist/|' | LC_ALL=C sort)"
 if [ "$actual" != "$expected" ]; then
   printf 'FAIL: unexpected dist membership\n--- expected ---\n%s\n--- actual ---\n%s\n' "$expected" "$actual" >&2
   exit 1

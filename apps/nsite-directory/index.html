@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Nsite Directory (Metadata-Only) · Pretend Internet</title>
+  <meta name="description" content="Offline metadata-only Nsite directory and NIP-01 canonical SHA-256 event inspector. Zero remote HTML, asset, or screenshot fetching.">
+  <link rel="stylesheet" href="./skin.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">Nsite <span>Directory</span></a>
+    <nav class="topnav" aria-label="Directory navigation">
+      <a href="../../index.html">Portal</a>
+      <button type="button" class="nav-link" id="skinToggleBtn">Daylight</button>
+      <button type="button" class="nav-link" id="helpBtn">Help</button>
+    </nav>
+    <button type="button" class="primary" id="importJsonBtn">Import events</button>
+  </header>
+
+  <input type="file" id="eventsFileInput" accept=".json,.jsonl,.ndjson,application/json" hidden>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Metadata-Only Nsite Directory</h1>
+        <p class="muted">Inspect NIP-01 &amp; nsite event records, verify canonical SHA-256 IDs, and group manifests without downloading remote sites.</p>
+      </div>
+      <div class="controls-bar" style="margin-top:0">
+        <button type="button" id="loadFixtureBtn">Load synthetic fixture</button>
+        <button type="button" id="togglePasteBtn">Paste JSON</button>
+        <button type="button" id="clearDataBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="boundary-note" role="note">
+      <strong>Metadata-only boundary (PI-04):</strong> This directory inspects imported Nostr event metadata, declared file paths, SHA-256 hashes, and NIP-65 relay roles only. It makes <strong>zero outbound network requests</strong> and never fetches remote HTML, assets, ZIPs, or screenshots. Publications with insufficient metadata remain explicitly marked <strong>unknown</strong>.
+    </div>
+
+    <section class="paste-panel" id="pastePanel" hidden aria-label="Paste Nostr event JSON">
+      <label for="pasteTextarea"><strong>Paste NIP-01 event JSON (object, array, or NDJSON)</strong></label>
+      <textarea id="pasteTextarea" placeholder='[{"id":"...","pubkey":"...","created_at":1762900000,"kind":35128,"tags":[["d","site"],["path","/index.html","..."]],"content":"","sig":"..."}]'></textarea>
+      <div class="controls-bar" style="margin-top:0">
+        <button type="button" class="primary" id="analyzePasteBtn">Inspect events</button>
+        <button type="button" id="cancelPasteBtn">Close</button>
+      </div>
+    </section>
+
+    <section class="stats-strip" aria-label="Inspection summary">
+      <div class="stat-card">
+        <span class="label">Publications</span>
+        <span class="value" id="statPubs">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Exact-content stacks</span>
+        <span class="value" id="statStacks">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Canonical ID matches</span>
+        <span class="value" id="statValidIds">0 / 0</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Unknown classifications</span>
+        <span class="value" id="statUnknown">0</span>
+      </div>
+    </section>
+
+    <div class="controls-bar">
+      <label class="sr-only" for="searchInput">Filter publications</label>
+      <input type="search" id="searchInput" placeholder="Filter by title, namespace, pubkey, path, or classification..." autocomplete="off">
+      <button type="button" id="viewPubsBtn" class="active-tab" aria-pressed="true">Publications</button>
+      <button type="button" id="viewStacksBtn" aria-pressed="false">Manifest stacks</button>
+      <button type="button" id="viewRelaysBtn" aria-pressed="false">NIP-65 relays</button>
+      <button type="button" id="viewEventsBtn" aria-pressed="false">Raw checks</button>
+    </div>
+
+    <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+
+    <div id="resultsContainer" class="result-list" aria-live="polite"></div>
+  </main>
+
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">Nsite Directory — Help</h2>
+      <p><strong>What this is:</strong> A strictly metadata-only Nsite directory and NIP-01 event inspector built to honor the PI-04 discovery boundary.</p>
+      <p><strong>How to start:</strong> Import a local Nostr event JSON/NDJSON file, click <em>Paste JSON</em>, or click <em>Load synthetic fixture</em> to inspect sample kind 35128, 15128, and 10002 records.</p>
+      <p><strong>What works:</strong> Real SHA-256 canonical event ID verification over <code>[0,pubkey,created_at,kind,tags,content]</code>, strict NIP-01 field validation, publisher &amp; namespace version grouping, exact manifest stacking across publishers, NIP-65 relay role parsing, and explicit <code>unknown</code> classification when metadata is sparse.</p>
+      <p><strong>Limitations:</strong> Structural and canonical ID verification only—<code>signatureVerified</code> is explicitly reported as <code>false</code> because BIP-340 secp256k1 verification is not bundled in this zero-dependency static app. Makes zero network calls and never downloads remote nsite files. Status is <em>testing</em> (browser-verified).</p>
+      <p><strong>Where your data goes:</strong> Imported event sets stay in browser <code>localStorage</code> until you click <em>Clear</em>. Nothing is transmitted over a network.</p>
+      <button type="button" class="primary" id="closeHelpBtn">Close help</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      parseJsonEventsInput,
+      analyzeEventsMetadataOnly,
+      getSyntheticFixtureEvents,
+    } from './directory-core.mjs';
+
+    const STORAGE_KEY = 'pretend-internet:nsite-directory:v1';
+    const SKIN_KEY = 'pretend-internet:skin';
+    const $ = (id) => document.getElementById(id);
+
+    let state = {
+      events: [],
+      analysis: null,
+      view: 'publications',
+      query: '',
+    };
+
+    function loadSkin() {
+      try {
+        const isDaylight = localStorage.getItem(SKIN_KEY) === 'daylight';
+        document.documentElement.dataset.skin = isDaylight ? 'daylight' : '';
+        $('skinToggleBtn').textContent = isDaylight ? 'Dark' : 'Daylight';
+      } catch { /* ignore */ }
+    }
+
+    function toggleSkin() {
+      const next = document.documentElement.dataset.skin === 'daylight' ? 'dark' : 'daylight';
+      document.documentElement.dataset.skin = next === 'daylight' ? 'daylight' : '';
+      $('skinToggleBtn').textContent = next === 'daylight' ? 'Dark' : 'Daylight';
+      try { localStorage.setItem(SKIN_KEY, next); } catch { /* ignore */ }
+    }
+
+    function setStatus(msg) {
+      $('statusLine').textContent = msg;
+    }
+
+    function saveEvents() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
+      } catch {
+        setStatus('Local storage limit reached; keeping dataset in memory for this session.');
+      }
+    }
+
+    let datasetRevision = 0;
+    let inputRevision = 0;
+
+    async function recompute(revision = datasetRevision) {
+      const analysis = await analyzeEventsMetadataOnly(state.events);
+      if (revision !== datasetRevision) return false;
+      state.analysis = analysis;
+      const s = state.analysis.summary;
+      $('statPubs').textContent = String(s.publicationCount);
+      $('statStacks').textContent = String(state.analysis.stacks.length);
+      $('statValidIds').textContent = `${s.idMatchedCount} / ${s.totalEvents}`;
+      $('statUnknown').textContent = String(s.unknownClassificationCount);
+      renderView();
+      return true;
+    }
+
+    function updateTabButtons() {
+      const mapping = {
+        publications: 'viewPubsBtn',
+        stacks: 'viewStacksBtn',
+        relays: 'viewRelaysBtn',
+        events: 'viewEventsBtn',
+      };
+      for (const [viewKey, id] of Object.entries(mapping)) {
+        const active = state.view === viewKey;
+        $(id).classList.toggle('active-tab', active);
+        $(id).setAttribute('aria-pressed', String(active));
+      }
+    }
+
+    function renderEmpty() {
+      const box = document.createElement('article');
+      box.className = 'pub-card';
+      const h2 = document.createElement('h2');
+      h2.textContent = 'No Nostr events loaded';
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = 'Import a local event JSON/NDJSON export, paste raw event JSON, or load the synthetic fixture dataset to inspect metadata-only grouping and canonical SHA-256 ID checks.';
+      box.append(h2, p);
+      return box;
+    }
+
+    function renderPublications(container) {
+      const q = state.query.trim().toLowerCase();
+      const pubs = (state.analysis?.publications || []).filter((p) => {
+        if (!q) return true;
+        const hay = [
+          p.title,
+          p.description,
+          p.namespace,
+          p.pubkey,
+          p.classification,
+          ...p.topics,
+          ...p.files.map((f) => `${f.path} ${f.hash}`),
+        ].join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+
+      if (!pubs.length) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = state.events.length ? 'No publications match your filter.' : '';
+        container.append(state.events.length ? p : renderEmpty());
+        return;
+      }
+
+      for (const pub of pubs) {
+        const card = document.createElement('article');
+        card.className = 'pub-card';
+
+        const h2 = document.createElement('h2');
+        h2.textContent = pub.title;
+
+        const meta = document.createElement('p');
+        meta.className = 'meta-row';
+        const classLabel = document.createElement('span');
+        classLabel.className = pub.classification === 'unknown' ? 'unknown' : '';
+        classLabel.textContent = `classification: ${pub.classification}`;
+        meta.append(
+          `kind ${pub.kind} · namespace ${pub.namespace} · ${pub.versionCount} ${pub.versionCount === 1 ? 'version' : 'versions'} · `,
+          classLabel,
+          ` (${pub.classificationBasis})`
+        );
+
+        const desc = document.createElement('p');
+        desc.textContent = pub.description;
+
+        const provenance = document.createElement('p');
+        provenance.className = 'meta-row mono';
+        provenance.textContent = `publisher ${pub.pubkey.slice(0, 16)}… · canonical ID ${pub.idMatches ? 'matched' : 'mismatch'} · sig verified: false · manifest ${pub.manifestFingerprint ? `${pub.manifestFingerprint.slice(0, 16)}…` : 'unknown (incomplete hashes)'}`;
+
+        card.append(h2, meta, desc, provenance);
+
+        if (pub.files.length) {
+          const table = document.createElement('table');
+          table.className = 'file-table';
+          const thead = document.createElement('thead');
+          const hr = document.createElement('tr');
+          for (const col of ['Declared path', 'Declared SHA-256 blob hash']) {
+            const th = document.createElement('th');
+            th.textContent = col;
+            hr.append(th);
+          }
+          thead.append(hr);
+          const tbody = document.createElement('tbody');
+          for (const file of pub.files) {
+            const tr = document.createElement('tr');
+            const tdPath = document.createElement('td');
+            tdPath.className = 'mono';
+            tdPath.textContent = file.path;
+            const tdHash = document.createElement('td');
+            tdHash.className = 'mono muted';
+            tdHash.textContent = file.hash;
+            tr.append(tdPath, tdHash);
+            tbody.append(tr);
+          }
+          table.append(thead, tbody);
+          card.append(table);
+        }
+        container.append(card);
+      }
+    }
+
+    function renderStacks(container) {
+      const stacks = state.analysis?.stacks || [];
+      if (!stacks.length) {
+        container.append(renderEmpty());
+        return;
+      }
+      for (const stack of stacks) {
+        const card = document.createElement('article');
+        card.className = 'pub-card';
+        const h2 = document.createElement('h2');
+        h2.textContent = stack.members[0]?.title || 'Manifest stack';
+        const meta = document.createElement('p');
+        meta.className = 'meta-row mono';
+        meta.textContent = `${stack.members.length} deployments · ${stack.publisherCount} ${stack.publisherCount === 1 ? 'publisher' : 'publishers'} · manifest SHA-256 ${stack.fingerprint.slice(0, 20)}…`;
+        const list = document.createElement('ul');
+        for (const m of stack.members) {
+          const li = document.createElement('li');
+          li.className = 'mono';
+          li.textContent = `${m.pubkey.slice(0, 16)}… · ${m.namespace} · ${m.files.length} files · classification: ${m.classification}`;
+          list.append(li);
+        }
+        card.append(h2, meta, list);
+        container.append(card);
+      }
+    }
+
+    function renderRelays(container) {
+      const lists = state.analysis?.relayLists || [];
+      if (!lists.length) {
+        const card = document.createElement('article');
+        card.className = 'pub-card';
+        card.textContent = 'No NIP-65 (kind 10002) relay list events in the current dataset.';
+        container.append(card);
+        return;
+      }
+      for (const rl of lists) {
+        const card = document.createElement('article');
+        card.className = 'pub-card';
+        const h2 = document.createElement('h2');
+        h2.className = 'mono';
+        h2.textContent = `NIP-65 relay list · ${rl.pubkey.slice(0, 16)}…`;
+        const table = document.createElement('table');
+        table.className = 'file-table';
+        const tbody = document.createElement('tbody');
+        for (const r of rl.validRelays) {
+          const tr = document.createElement('tr');
+          const tdU = document.createElement('td');
+          tdU.className = 'mono';
+          tdU.textContent = r.url;
+          const tdR = document.createElement('td');
+          tdR.textContent = r.role;
+          tr.append(tdU, tdR);
+          tbody.append(tr);
+        }
+        for (const inv of rl.invalidEntries) {
+          const tr = document.createElement('tr');
+          const tdU = document.createElement('td');
+          tdU.className = 'mono muted';
+          tdU.textContent = inv.rawUrl || '(empty)';
+          const tdR = document.createElement('td');
+          tdR.className = 'unknown';
+          tdR.textContent = `Rejected: ${inv.reason}`;
+          tr.append(tdU, tdR);
+          tbody.append(tr);
+        }
+        table.append(tbody);
+        card.append(h2, table);
+        container.append(card);
+      }
+    }
+
+    function renderRawChecks(container) {
+      const inspected = state.analysis?.inspected || [];
+      if (!inspected.length) {
+        container.append(renderEmpty());
+        return;
+      }
+      for (const item of inspected) {
+        const card = document.createElement('article');
+        card.className = 'pub-card';
+        const h2 = document.createElement('h2');
+        h2.className = 'mono';
+        h2.textContent = `kind ${item.raw?.kind ?? '?'} · ${item.persistence} · shape ${item.validShape ? 'valid' : 'invalid'}`;
+        const p = document.createElement('p');
+        p.className = 'meta-row mono';
+        p.textContent = `computed ID: ${item.computedId || 'n/a'} · ID matches: ${item.idMatches} · signatureVerified: false`;
+        card.append(h2, p);
+        if (item.issues.length) {
+          const err = document.createElement('p');
+          err.className = 'unknown';
+          err.textContent = `Validation issues: ${item.issues.join('; ')}`;
+          card.append(err);
+        }
+        container.append(card);
+      }
+    }
+
+    function renderView() {
+      updateTabButtons();
+      const container = $('resultsContainer');
+      container.textContent = '';
+      if (state.view === 'publications') renderPublications(container);
+      else if (state.view === 'stacks') renderStacks(container);
+      else if (state.view === 'relays') renderRelays(container);
+      else renderRawChecks(container);
+    }
+
+    $('importJsonBtn').addEventListener('click', () => $('eventsFileInput').click());
+    $('eventsFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      const inputId = ++inputRevision;
+      const input = await file.text();
+      if (inputId !== inputRevision) return;
+      const result = parseJsonEventsInput(input);
+      if (result.error) {
+        setStatus(result.error);
+        return;
+      }
+      state.events = result.events;
+      saveEvents();
+      if (!await recompute(++datasetRevision)) return;
+      setStatus(`Loaded ${result.events.length} events from "${file.name}" (metadata-only, zero remote fetches).`);
+    });
+
+    $('loadFixtureBtn').addEventListener('click', async () => {
+      const inputId = ++inputRevision;
+      const events = await getSyntheticFixtureEvents();
+      if (inputId !== inputRevision) return;
+      state.events = events;
+      saveEvents();
+      if (!await recompute(++datasetRevision)) return;
+      setStatus(`Loaded ${state.events.length} synthetic fixture events with canonical SHA-256 IDs.`);
+    });
+
+    $('togglePasteBtn').addEventListener('click', () => {
+      $('pastePanel').hidden = !$('pastePanel').hidden;
+      if (!$('pastePanel').hidden) $('pasteTextarea').focus();
+    });
+    $('cancelPasteBtn').addEventListener('click', () => { $('pastePanel').hidden = true; });
+    $('analyzePasteBtn').addEventListener('click', async () => {
+      const result = parseJsonEventsInput($('pasteTextarea').value);
+      if (result.error) {
+        setStatus(result.error);
+        return;
+      }
+      state.events = result.events;
+      saveEvents();
+      $('pastePanel').hidden = true;
+      ++inputRevision;
+      if (!await recompute(++datasetRevision)) return;
+      setStatus(`Inspected ${result.events.length} pasted events (metadata-only).`);
+    });
+
+    $('clearDataBtn').addEventListener('click', async () => {
+      ++inputRevision;
+      state.events = [];
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      if (!await recompute(++datasetRevision)) return;
+      setStatus('Cleared local metadata workspace.');
+    });
+
+    $('searchInput').addEventListener('input', (e) => { state.query = e.target.value; renderView(); });
+    $('viewPubsBtn').addEventListener('click', () => { state.view = 'publications'; renderView(); });
+    $('viewStacksBtn').addEventListener('click', () => { state.view = 'stacks'; renderView(); });
+    $('viewRelaysBtn').addEventListener('click', () => { state.view = 'relays'; renderView(); });
+    $('viewEventsBtn').addEventListener('click', () => { state.view = 'events'; renderView(); });
+
+    $('skinToggleBtn').addEventListener('click', toggleSkin);
+    $('helpBtn').addEventListener('click', () => { $('helpModal').hidden = false; $('closeHelpBtn').focus(); });
+    $('closeHelpBtn').addEventListener('click', () => { $('helpModal').hidden = true; });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') $('helpModal').hidden = true;
+    });
+
+    loadSkin();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) state.events = parsed;
+      }
+    } catch { /* ignore */ }
+    recompute();
+  </script>
+</body>
+</html>

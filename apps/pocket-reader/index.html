@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Pocket Reader · Pretend Internet</title>
+  <meta name="description" content="Offline Markdown, plain text, and HTML chapter reader with swipe navigation, focus mode, and persistent local reading position.">
+  <link rel="stylesheet" href="./skin.css">
+</head>
+<body>
+  <header class="topbar" id="topbar">
+    <a class="brand" href="../../index.html">Pocket <span>Reader</span></a>
+    <nav class="topnav" aria-label="Reader navigation">
+      <a href="../../index.html">Portal</a>
+      <button type="button" class="nav-link" id="navShelfBtn">Shelf</button>
+      <button type="button" class="nav-link" id="skinToggleBtn">Daylight</button>
+      <button type="button" class="nav-link" id="helpBtn">Help</button>
+    </nav>
+    <button type="button" class="primary" id="importTopBtn">Import file</button>
+  </header>
+
+  <button type="button" id="restoreChromeBtn" hidden aria-label="Show reader controls">Show controls</button>
+
+  <input type="file" id="fileInput" accept=".md,.markdown,.txt,.html,.htm" multiple hidden>
+  <input type="file" id="backupInput" accept=".json,application/json" hidden>
+
+  <main id="app">
+    <section id="shelfView" aria-labelledby="shelfHeading">
+      <div class="shelf-header">
+        <div>
+          <h1 id="shelfHeading">Local Reading Shelf</h1>
+          <p class="meta" id="shelfSummary">Testing · Offline · Stored in browser localStorage</p>
+        </div>
+        <div class="reader-controls">
+          <button type="button" id="pasteReadingBtn">New text</button>
+          <button type="button" id="loadSampleBtn">Load synthetic sample</button>
+          <button type="button" id="exportShelfBtn">Export JSON</button>
+          <button type="button" id="importBackupBtn">Restore JSON</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <label class="sr-only" for="shelfSearch">Search saved readings</label>
+        <input type="search" id="shelfSearch" placeholder="Search titles or filenames..." autocomplete="off">
+      </div>
+
+      <p class="status-line" id="statusMessage" role="status" aria-live="polite"></p>
+
+      <div id="emptyShelf" class="empty-state" hidden>
+        <h2>Your shelf is empty by default</h2>
+        <p>Public builds never bundle personal books or articles. Import a local <code>.md</code>, <code>.txt</code>, or <code>.html</code> file from your device, paste a reading, or load a clearly labeled synthetic sample to test chapter swiping and Focus Mode.</p>
+        <div class="book-actions">
+          <button type="button" class="primary" id="emptyImportBtn">Import local file</button>
+          <button type="button" id="emptySampleBtn">Load synthetic sample</button>
+        </div>
+      </div>
+
+      <div id="bookGrid" class="book-grid" aria-label="Saved readings"></div>
+    </section>
+
+    <section id="readerView" class="reader-shell" hidden aria-label="Reading view">
+      <div class="reader-bar" id="readerBar">
+        <div class="reader-controls">
+          <button type="button" id="backToShelfBtn">← Shelf</button>
+          <button type="button" id="tocBtn">Chapters</button>
+          <button type="button" id="bookmarkChapterBtn" aria-pressed="false">Bookmark</button>
+        </div>
+        <div class="reader-controls">
+          <button type="button" id="fontSmallerBtn" aria-label="Decrease font size">A−</button>
+          <button type="button" id="fontLargerBtn" aria-label="Increase font size">A+</button>
+          <button type="button" id="fontFaceBtn">Serif</button>
+          <button type="button" id="focusModeBtn" aria-pressed="false">Focus</button>
+        </div>
+      </div>
+
+      <article id="readingSurface" class="reading-surface font-serif">
+        <div class="chapter-kicker" id="chapterKicker">Chapter 1 of 1</div>
+        <h1 class="chapter-title" id="chapterTitle"></h1>
+        <div class="chapter-body" id="chapterBody"></div>
+      </article>
+
+      <div class="reader-footer">
+        <button type="button" id="prevChapterBtn">← Previous</button>
+        <span class="meta" id="readerFooterMeta">Swipe left or right to change chapters</span>
+        <button type="button" class="primary" id="nextChapterBtn">Next →</button>
+      </div>
+    </section>
+    <p class="status-line" id="storageWarning" role="status" hidden
+      style="position: sticky; bottom: env(safe-area-inset-bottom, 0px); z-index: 19; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border);"></p>
+  </main>
+
+  <div id="pasteModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+      <h2 id="pasteTitle">Add text to shelf</h2>
+      <p class="meta">Use Markdown headings (<code>#</code> or <code>##</code>) or <code>---</code> lines to split chapters.</p>
+      <label for="pasteDocTitle">Title</label>
+      <input type="text" id="pasteDocTitle" placeholder="My reading note">
+      <label for="pasteDocBody">Content</label>
+      <textarea id="pasteDocBody" placeholder="## Chapter 1&#10;&#10;Paste or type text here..."></textarea>
+      <div class="toolbar">
+        <button type="button" class="primary" id="savePasteBtn">Save to shelf</button>
+        <button type="button" id="cancelPasteBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tocModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tocTitle">
+      <h2 id="tocTitle">Chapters &amp; bookmarks</h2>
+      <ul id="tocList" class="toc-list"></ul>
+      <button type="button" id="closeTocBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">Pocket Reader — Help</h2>
+      <p><strong>What this is:</strong> A standalone, offline-first chapter reader for Markdown, plain text, and sanitized HTML documents.</p>
+      <p><strong>How to start:</strong> Click <em>Import file</em> to load local <code>.md</code>, <code>.txt</code>, or <code>.html</code> files, paste text with <em>New text</em>, or try the <em>Load synthetic sample</em> button.</p>
+      <p><strong>What works:</strong> Chapter splitting, swipe left/right and keyboard arrow navigation, scroll-hiding Focus Mode, adjustable font size, serif/sans toggle, bookmarks, Dark and Daylight skins, and JSON shelf backup.</p>
+      <p><strong>Limitations:</strong> Imported HTML is converted to safe plain text and headings (scripts and external images are not executed). Binary EPUB/PDF archives are not parsed yet. Status is <em>testing</em> (browser-verified, not an installed Android APK release).</p>
+      <p><strong>Where your data goes:</strong> All readings, bookmarks, and preferences stay strictly in this browser's <code>localStorage</code>. Nothing is uploaded or synced over a network.</p>
+      <button type="button" class="primary" id="closeHelpBtn">Close help</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      MAX_FILE_BYTES,
+      parseDocumentToChapters,
+      createBookRecord,
+      clampChapterIndex,
+      getSyntheticSampleBook,
+      validateShelfBackup,
+    } from './reader-core.mjs';
+
+    const STORAGE_KEY = 'pretend-internet:pocket-reader:v1';
+    const SKIN_KEY = 'pretend-internet:skin';
+    const $ = (id) => document.getElementById(id);
+
+    let state = {
+      books: [],
+      activeBookId: null,
+      fontSize: 19,
+      fontFace: 'serif',
+      focusMode: false,
+      search: '',
+    };
+
+    function loadSkin() {
+      try {
+        const saved = localStorage.getItem(SKIN_KEY);
+        const skin = saved === 'daylight' ? 'daylight' : 'dark';
+        document.documentElement.dataset.skin = skin === 'daylight' ? 'daylight' : '';
+        $('skinToggleBtn').textContent = skin === 'daylight' ? 'Dark' : 'Daylight';
+      } catch {
+        // storage unavailable
+      }
+    }
+
+    function toggleSkin() {
+      const next = document.documentElement.dataset.skin === 'daylight' ? 'dark' : 'daylight';
+      document.documentElement.dataset.skin = next === 'daylight' ? 'daylight' : '';
+      $('skinToggleBtn').textContent = next === 'daylight' ? 'Dark' : 'Daylight';
+      try {
+        localStorage.setItem(SKIN_KEY, next);
+      } catch {
+        setStatus('Skin changed for this session (localStorage unavailable).');
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.books)) state.books = parsed.books;
+        if (typeof parsed.activeBookId === 'string') state.activeBookId = parsed.activeBookId;
+        if (Number.isFinite(parsed.fontSize)) state.fontSize = Math.min(26, Math.max(15, parsed.fontSize));
+        if (parsed.fontFace === 'sans' || parsed.fontFace === 'serif') state.fontFace = parsed.fontFace;
+      } catch {
+        setStatus('Could not read saved shelf from localStorage.');
+      }
+    }
+
+    function saveState(successMessage) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          books: state.books,
+          activeBookId: state.activeBookId,
+          fontSize: state.fontSize,
+          fontFace: state.fontFace,
+        }));
+        $('storageWarning').hidden = true;
+        $('storageWarning').textContent = '';
+        if (successMessage) setStatus(successMessage);
+      } catch {
+        const warning = $('storageWarning');
+        warning.hidden = false;
+        warning.textContent = 'Storage quota reached or unavailable; changes stay in memory.';
+      }
+    }
+
+    function setStatus(msg) {
+      $('statusMessage').textContent = msg;
+    }
+
+    function getActiveBook() {
+      return state.books.find((b) => b.id === state.activeBookId) || null;
+    }
+
+    function setChromeCollapsed(collapsed) {
+      $('topbar').classList.toggle('chrome-hidden', collapsed);
+      $('readerBar').hidden = collapsed;
+      $('restoreChromeBtn').hidden = !collapsed;
+    }
+
+    function renderShelf() {
+      const q = state.search.trim().toLowerCase();
+      const filtered = state.books
+        .filter((b) => !q || b.title.toLowerCase().includes(q) || b.sourceName.toLowerCase().includes(q))
+        .sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0));
+
+      $('shelfSummary').textContent = `${state.books.length} ${state.books.length === 1 ? 'reading' : 'readings'} saved · Offline · localStorage`;
+      $('emptyShelf').hidden = state.books.length > 0;
+      const grid = $('bookGrid');
+      grid.textContent = '';
+
+      if (state.books.length > 0 && filtered.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = `No readings match "${state.search}".`;
+        grid.append(p);
+        return;
+      }
+
+      for (const book of filtered) {
+        const card = document.createElement('article');
+        card.className = 'book-card';
+
+        const top = document.createElement('div');
+        const h2 = document.createElement('h2');
+        h2.textContent = book.title;
+        const meta = document.createElement('p');
+        meta.className = 'meta';
+        const chNum = clampChapterIndex(book.chapterIndex, book.chapters.length) + 1;
+        const pct = Math.round((chNum / book.chapters.length) * 100);
+        meta.textContent = `Chapter ${chNum} of ${book.chapters.length} · ${book.minutes} min read · ${book.words} words`;
+
+        const src = document.createElement('p');
+        src.className = 'meta';
+        src.textContent = book.sourceName;
+
+        const track = document.createElement('div');
+        track.className = 'progress-track';
+        const fill = document.createElement('div');
+        fill.className = 'progress-fill';
+        fill.style.width = `${pct}%`;
+        track.append(fill);
+
+        top.append(h2, meta, src, track);
+
+        const actions = document.createElement('div');
+        actions.className = 'book-actions';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'primary';
+        openBtn.textContent = chNum > 1 ? `Resume Ch. ${chNum}` : 'Read';
+        openBtn.addEventListener('click', () => openBook(book.id));
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'danger';
+        delBtn.textContent = 'Remove';
+        delBtn.setAttribute('aria-label', `Remove ${book.title}`);
+        delBtn.addEventListener('click', () => {
+          state.books = state.books.filter((item) => item.id !== book.id);
+          if (state.activeBookId === book.id) state.activeBookId = null;
+          saveState(`Removed "${book.title}".`);
+          render();
+        });
+
+        actions.append(openBtn, delBtn);
+        card.append(top, actions);
+        grid.append(card);
+      }
+    }
+
+    function renderReader() {
+      const book = getActiveBook();
+      if (!book) {
+        state.activeBookId = null;
+        render();
+        return;
+      }
+
+      const idx = clampChapterIndex(book.chapterIndex, book.chapters.length);
+      book.chapterIndex = idx;
+      const chapter = book.chapters[idx];
+
+      const surface = $('readingSurface');
+      surface.className = `reading-surface font-${state.fontFace}`;
+      surface.style.fontSize = `${state.fontSize}px`;
+      surface.style.lineHeight = '1.68';
+
+      $('chapterKicker').textContent = `${book.title} · Chapter ${idx + 1} of ${book.chapters.length}`;
+      $('chapterTitle').textContent = chapter.heading;
+
+      const body = $('chapterBody');
+      body.textContent = '';
+      for (const para of chapter.paragraphs) {
+        const p = document.createElement('p');
+        p.textContent = para;
+        body.append(p);
+      }
+
+      const isBookmarked = Array.isArray(book.bookmarks) && book.bookmarks.includes(idx);
+      $('bookmarkChapterBtn').setAttribute('aria-pressed', String(isBookmarked));
+      $('bookmarkChapterBtn').textContent = isBookmarked ? 'Bookmarked' : 'Bookmark';
+      $('fontFaceBtn').textContent = state.fontFace === 'serif' ? 'Sans' : 'Serif';
+      $('focusModeBtn').setAttribute('aria-pressed', String(state.focusMode));
+      $('focusModeBtn').textContent = state.focusMode ? 'Exit Focus' : 'Focus';
+
+      $('prevChapterBtn').disabled = idx === 0;
+      $('nextChapterBtn').disabled = idx >= book.chapters.length - 1;
+      $('readerFooterMeta').textContent = `Chapter ${idx + 1} / ${book.chapters.length} · ${state.fontSize}px · Swipe or use arrow keys`;
+      setChromeCollapsed(state.focusMode);
+    }
+
+    function render() {
+      const hasBook = Boolean(getActiveBook());
+      $('shelfView').hidden = hasBook;
+      $('readerView').hidden = !hasBook;
+      if (hasBook) {
+        renderReader();
+      } else {
+        state.focusMode = false;
+        setChromeCollapsed(false);
+        renderShelf();
+      }
+    }
+
+    function openBook(id, successMessage) {
+      const book = state.books.find((b) => b.id === id);
+      if (!book) return;
+      book.lastOpenedAt = Date.now();
+      state.activeBookId = book.id;
+      saveState(successMessage);
+      render();
+      window.scrollTo({ top: book.scrollTop || 0, behavior: 'auto' });
+    }
+
+    function stepChapter(delta) {
+      const book = getActiveBook();
+      if (!book) return;
+      const next = clampChapterIndex(book.chapterIndex + delta, book.chapters.length);
+      if (next === book.chapterIndex) return;
+      book.chapterIndex = next;
+      book.scrollTop = 0;
+      book.lastOpenedAt = Date.now();
+      saveState();
+      renderReader();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    async function handleFileImport(files) {
+      if (!files || !files.length) return;
+      let added = 0;
+      for (const file of files) {
+        if (file.size > MAX_FILE_BYTES) {
+          setStatus(`Skipped "${file.name}" (exceeds 2 MiB browser shelf limit).`);
+          continue;
+        }
+        const text = await file.text();
+        const parsed = parseDocumentToChapters(text, file.name);
+        const record = createBookRecord({ title: parsed.title, chapters: parsed.chapters, sourceName: file.name });
+        state.books.unshift(record);
+        added++;
+      }
+      if (added > 0) {
+        saveState(`Imported ${added} ${added === 1 ? 'reading' : 'readings'} into your local shelf.`);
+        render();
+      }
+    }
+
+    function openToc() {
+      const book = getActiveBook();
+      if (!book) return;
+      const list = $('tocList');
+      list.textContent = '';
+      book.chapters.forEach((ch, idx) => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        if (idx === book.chapterIndex) btn.setAttribute('aria-current', 'true');
+        const mark = book.bookmarks?.includes(idx) ? ' ★' : '';
+        btn.textContent = `${idx + 1}. ${ch.heading}${mark}`;
+        btn.addEventListener('click', () => {
+          book.chapterIndex = idx;
+          book.scrollTop = 0;
+          saveState();
+          $('tocModal').hidden = true;
+          renderReader();
+          window.scrollTo({ top: 0, behavior: 'auto' });
+        });
+        li.append(btn);
+        list.append(li);
+      });
+      $('tocModal').hidden = false;
+    }
+
+    function exportShelf() {
+      const blob = new Blob(
+        [JSON.stringify({ format: 'pretend-internet.pocket-reader.v1', exportedAt: new Date().toISOString(), books: state.books }, null, 2)],
+        { type: 'application/json' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pocket-reader-shelf.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus(`Exported ${state.books.length} readings to JSON.`);
+    }
+
+    // Event wiring
+    $('importTopBtn').addEventListener('click', () => $('fileInput').click());
+    $('emptyImportBtn').addEventListener('click', () => $('fileInput').click());
+    $('fileInput').addEventListener('change', async (e) => {
+      await handleFileImport(e.target.files);
+      e.target.value = '';
+    });
+
+    const loadSample = () => {
+      const existing = state.books.find((b) => b.sourceName.includes('Synthetic sample'));
+      if (existing) {
+        openBook(existing.id);
+        return;
+      }
+      const sample = getSyntheticSampleBook();
+      state.books.unshift(sample);
+      saveState('Loaded synthetic sample reading. Open it or import your own files.');
+      render();
+    };
+    $('loadSampleBtn').addEventListener('click', loadSample);
+    $('emptySampleBtn').addEventListener('click', loadSample);
+
+    $('pasteReadingBtn').addEventListener('click', () => {
+      $('pasteDocTitle').value = '';
+      $('pasteDocBody').value = '';
+      $('pasteModal').hidden = false;
+      $('pasteDocTitle').focus();
+    });
+    $('cancelPasteBtn').addEventListener('click', () => { $('pasteModal').hidden = true; });
+    $('savePasteBtn').addEventListener('click', () => {
+      const title = $('pasteDocTitle').value.trim();
+      const body = $('pasteDocBody').value.trim();
+      if (!body) {
+        setStatus('Enter some text before saving to the shelf.');
+        return;
+      }
+      const parsed = parseDocumentToChapters(body, `${title || 'Local Note'}.md`);
+      const record = createBookRecord({ title: title || parsed.title, chapters: parsed.chapters, sourceName: 'Pasted text' });
+      state.books.unshift(record);
+      $('pasteModal').hidden = true;
+      openBook(record.id, `Saved "${record.title}" to your shelf.`);
+    });
+
+    $('exportShelfBtn').addEventListener('click', exportShelf);
+    $('importBackupBtn').addEventListener('click', () => $('backupInput').click());
+    $('backupInput').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        const result = validateShelfBackup(parsed);
+        if (result.error) {
+          setStatus(result.error);
+          return;
+        }
+        const existingIds = new Set(state.books.map((b) => b.id));
+        const merged = [...result.books.filter((b) => !existingIds.has(b.id)), ...state.books];
+        state.books = merged;
+        saveState(`Restored ${result.books.length} readings from backup.`);
+        render();
+      } catch {
+        setStatus('Could not parse backup JSON file.');
+      }
+    });
+
+    $('shelfSearch').addEventListener('input', (e) => {
+      state.search = e.target.value;
+      renderShelf();
+    });
+
+    $('navShelfBtn').addEventListener('click', () => {
+      state.activeBookId = null;
+      state.focusMode = false;
+      saveState();
+      render();
+    });
+    $('backToShelfBtn').addEventListener('click', () => {
+      state.activeBookId = null;
+      state.focusMode = false;
+      saveState();
+      render();
+    });
+
+    $('prevChapterBtn').addEventListener('click', () => stepChapter(-1));
+    $('nextChapterBtn').addEventListener('click', () => stepChapter(1));
+    $('tocBtn').addEventListener('click', openToc);
+    $('closeTocBtn').addEventListener('click', () => { $('tocModal').hidden = true; });
+
+    $('bookmarkChapterBtn').addEventListener('click', () => {
+      const book = getActiveBook();
+      if (!book) return;
+      if (!Array.isArray(book.bookmarks)) book.bookmarks = [];
+      const idx = book.chapterIndex;
+      if (book.bookmarks.includes(idx)) {
+        book.bookmarks = book.bookmarks.filter((n) => n !== idx);
+      } else {
+        book.bookmarks.push(idx);
+      }
+      saveState();
+      renderReader();
+    });
+
+    $('fontSmallerBtn').addEventListener('click', () => {
+      state.fontSize = Math.max(15, state.fontSize - 1);
+      saveState();
+      renderReader();
+    });
+    $('fontLargerBtn').addEventListener('click', () => {
+      state.fontSize = Math.min(26, state.fontSize + 1);
+      saveState();
+      renderReader();
+    });
+    $('fontFaceBtn').addEventListener('click', () => {
+      state.fontFace = state.fontFace === 'serif' ? 'sans' : 'serif';
+      saveState();
+      renderReader();
+    });
+    $('focusModeBtn').addEventListener('click', () => {
+      state.focusMode = !state.focusMode;
+      renderReader();
+    });
+    $('restoreChromeBtn').addEventListener('click', () => {
+      state.focusMode = false;
+      setChromeCollapsed(false);
+      renderReader();
+    });
+
+    $('skinToggleBtn').addEventListener('click', toggleSkin);
+    $('helpBtn').addEventListener('click', () => { $('helpModal').hidden = false; $('closeHelpBtn').focus(); });
+    $('closeHelpBtn').addEventListener('click', () => { $('helpModal').hidden = true; });
+
+    // Touch swipe navigation on reading surface
+    let touchStart = null;
+    $('readingSurface').addEventListener('touchstart', (e) => {
+      const t = e.changedTouches?.[0];
+      if (t) touchStart = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    $('readingSurface').addEventListener('touchend', (e) => {
+      if (!touchStart) return;
+      const t = e.changedTouches?.[0];
+      const start = touchStart;
+      touchStart = null;
+      if (!t) return;
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+        stepChapter(dx < 0 ? 1 : -1);
+      }
+    }, { passive: true });
+
+    // Scroll persistence & auto-collapse chrome on scroll while reading
+    let scrollTimer = null;
+    window.addEventListener('scroll', () => {
+      const book = getActiveBook();
+      if (!book) return;
+      if (window.scrollY > 140) {
+        setChromeCollapsed(true);
+      } else if (window.scrollY <= 40 && !state.focusMode) {
+        setChromeCollapsed(false);
+      }
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        book.scrollTop = Math.round(window.scrollY);
+        saveState();
+      }, 250);
+    }, { passive: true });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        $('helpModal').hidden = true;
+        $('tocModal').hidden = true;
+        $('pasteModal').hidden = true;
+        if (state.focusMode) {
+          state.focusMode = false;
+          renderReader();
+        }
+        return;
+      }
+      if (!getActiveBook()) return;
+      if (!$('pasteModal').hidden || !$('tocModal').hidden || !$('helpModal').hidden) return;
+      if (e.key === 'ArrowRight') stepChapter(1);
+      if (e.key === 'ArrowLeft') stepChapter(-1);
+    });
+
+    loadSkin();
+    loadState();
+    render();
+    const restoredBook = getActiveBook();
+    if (restoredBook) window.scrollTo({ top: restoredBook.scrollTop || 0, behavior: 'auto' });
+  </script>
+</body>
+</html>

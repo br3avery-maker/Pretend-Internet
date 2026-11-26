@@ -21,6 +21,10 @@ jobs:
           done
       - name: Verify mini-app validator diagnostics
         run: python3 scripts/test_validate_mini_app.py
+      - name: Verify Pretend Internet portal and standalone apps
+        run: |
+          npm run lint
+          npm test
       - name: Verify shell-only build
         run: |
           sh scripts/build-frontend.sh

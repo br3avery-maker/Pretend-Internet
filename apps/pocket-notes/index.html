@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Pocket Notes · Pretend Internet</title>
+  <meta name="description" content="Offline local-first notebook with search, tag filtering, Markdown preview, undo delete, and JSON or Markdown backup.">
+  <link rel="stylesheet" href="./skin.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../../index.html">Pocket <span>Notes</span></a>
+    <nav class="topnav" aria-label="Notes navigation">
+      <a href="../../index.html">Portal</a>
+      <button type="button" class="nav-link" id="skinToggleBtn">Daylight</button>
+      <button type="button" class="nav-link" id="helpBtn">Help</button>
+    </nav>
+    <button type="button" class="primary" id="newNoteBtn">New note</button>
+  </header>
+
+  <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Saved notes">
+      <label class="sr-only" for="searchInput">Search notes</label>
+      <input type="search" id="searchInput" placeholder="Search titles, text, tags..." autocomplete="off">
+
+      <div class="filter-row">
+        <button type="button" id="activeTabBtn" class="active-tab" aria-pressed="true">Active</button>
+        <button type="button" id="archiveTabBtn" aria-pressed="false">Archived</button>
+      </div>
+
+      <div id="tagBar" class="tag-bar" aria-label="Filter by tag"></div>
+
+      <div id="noteList" class="note-list"></div>
+
+      <div class="filter-row">
+        <button type="button" id="exportJsonBtn">Export JSON</button>
+        <button type="button" id="exportMdBtn">Export .md</button>
+        <button type="button" id="importJsonBtn">Import JSON</button>
+      </div>
+    </aside>
+
+    <section class="editor-pane" aria-label="Note editor">
+      <div id="undoBar" class="undo-bar" hidden role="status" aria-live="polite">
+        <span id="undoText">Note deleted.</span>
+        <button type="button" class="primary" id="undoDeleteBtn">Undo delete</button>
+      </div>
+
+      <div id="emptyEditor" class="empty-editor">
+        <h2>Start writing offline</h2>
+        <p>Notes save automatically to this browser's localStorage. Create a note to begin, or import a previous JSON backup.</p>
+        <button type="button" class="primary" id="emptyNewBtn">Create first note</button>
+      </div>
+
+      <div id="editorContainer" hidden>
+        <div class="editor-toolbar">
+          <div class="toolbar-group">
+            <button type="button" id="modeEditBtn" class="active-tab" aria-pressed="true">Edit</button>
+            <button type="button" id="modePreviewBtn" aria-pressed="false">Preview</button>
+          </div>
+          <div class="toolbar-group">
+            <button type="button" id="pinBtn" aria-pressed="false">Pin</button>
+            <button type="button" id="archiveBtn">Archive</button>
+            <button type="button" id="deleteBtn">Delete</button>
+          </div>
+        </div>
+
+        <label class="sr-only" for="noteTitleInput">Note title</label>
+        <input type="text" id="noteTitleInput" class="title-input" placeholder="Note title">
+
+        <label class="sr-only" for="noteTagsInput">Tags (comma separated)</label>
+        <input type="text" id="noteTagsInput" class="tags-input" placeholder="Tags (comma separated, e.g. ideas, offline, checklist)">
+
+        <label class="sr-only" for="noteBodyInput">Note content</label>
+        <textarea id="noteBodyInput" class="body-textarea" placeholder="Write in plain text or Markdown (# Heading, - [ ] task, > quote)..."></textarea>
+
+        <div id="previewSurface" class="preview-surface" hidden></div>
+
+        <div class="status-bar">
+          <span id="statsLine">0 words · 0 chars</span>
+          <span id="saveStatus" role="status" aria-live="polite">Saved locally</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">Pocket Notes — Help</h2>
+      <p><strong>What this is:</strong> A standalone offline notebook and scratchpad with Markdown preview, tags, pinning, and portable backups.</p>
+      <p><strong>How to start:</strong> Click <em>New note</em>, enter a title and body, and optionally add comma-separated tags. Switch between <em>Edit</em> and <em>Preview</em> to inspect formatted headings, lists, checklists, and quotes.</p>
+      <p><strong>What works:</strong> Instant local saving, search, tag filters, pinning, archiving, Undo delete, Dark and Daylight skins, and JSON or Markdown export/import.</p>
+      <p><strong>Limitations:</strong> Plain-text/Markdown only (no embedded image attachments). Status is <em>testing</em> (browser-verified, not an installed Android APK release).</p>
+      <p><strong>Where your data goes:</strong> All notes remain in this browser's <code>localStorage</code>. Nothing is sent to a server or account. Use <em>Export JSON</em> to keep your own backup.</p>
+      <button type="button" class="primary" id="closeHelpBtn">Close help</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      createNote,
+      updateNote,
+      filterNotes,
+      collectTags,
+      noteStats,
+      parseSafeMarkdownBlocks,
+      exportNotesToMarkdown,
+      validateNotesBackup,
+    } from './notes-core.mjs';
+
+    const STORAGE_KEY = 'pretend-internet:pocket-notes:v1';
+    const SKIN_KEY = 'pretend-internet:skin';
+    const $ = (id) => document.getElementById(id);
+
+    let state = {
+      notes: [],
+      selectedId: null,
+      query: '',
+      tag: '',
+      showArchived: false,
+      mode: 'edit',
+      lastDeleted: null,
+    };
+
+    function loadSkin() {
+      try {
+        const saved = localStorage.getItem(SKIN_KEY);
+        const isDaylight = saved === 'daylight';
+        document.documentElement.dataset.skin = isDaylight ? 'daylight' : '';
+        $('skinToggleBtn').textContent = isDaylight ? 'Dark' : 'Daylight';
+      } catch {
+        // ignore
+      }
+    }
+
+    function toggleSkin() {
+      const next = document.documentElement.dataset.skin === 'daylight' ? 'dark' : 'daylight';
+      document.documentElement.dataset.skin = next === 'daylight' ? 'daylight' : '';
+      $('skinToggleBtn').textContent = next === 'daylight' ? 'Dark' : 'Daylight';
+      try { localStorage.setItem(SKIN_KEY, next); } catch { /* ignore */ }
+    }
+
+    function loadNotes() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.notes)) state.notes = parsed.notes;
+        if (typeof parsed.selectedId === 'string') state.selectedId = parsed.selectedId;
+      } catch {
+        $('saveStatus').textContent = 'Storage unavailable; using session memory.';
+      }
+    }
+
+    function saveNotes(message = 'Saved locally') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          notes: state.notes,
+          selectedId: state.selectedId,
+        }));
+        $('saveStatus').textContent = message;
+      } catch {
+        $('saveStatus').textContent = 'Storage full or blocked; changes kept in memory.';
+      }
+    }
+
+    function getSelected() {
+      return state.notes.find((n) => n.id === state.selectedId) || null;
+    }
+
+    function renderTags() {
+      const bar = $('tagBar');
+      bar.textContent = '';
+      const tags = collectTags(state.notes);
+      if (!tags.length && !state.tag) return;
+
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = `tag-btn ${!state.tag ? 'active-tab' : ''}`;
+      allBtn.textContent = 'All tags';
+      allBtn.addEventListener('click', () => { state.tag = ''; render(); });
+      bar.append(allBtn);
+
+      for (const item of tags) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `tag-btn ${state.tag === item.tag ? 'active-tab' : ''}`;
+        btn.textContent = `#${item.tag} (${item.count})`;
+        btn.addEventListener('click', () => {
+          state.tag = state.tag === item.tag ? '' : item.tag;
+          render();
+        });
+        bar.append(btn);
+      }
+    }
+
+    function renderList() {
+      const list = $('noteList');
+      list.textContent = '';
+      const visible = filterNotes(state.notes, {
+        query: state.query,
+        tag: state.tag,
+        showArchived: state.showArchived,
+      });
+
+      if (!visible.length) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = state.showArchived ? 'No archived notes.' : 'No matching notes.';
+        list.append(p);
+        return;
+      }
+
+      for (const note of visible) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'note-item';
+        if (note.id === state.selectedId) btn.setAttribute('aria-current', 'true');
+
+        const title = document.createElement('strong');
+        title.textContent = `${note.pinned ? '★ ' : ''}${note.title || 'Untitled Note'}`;
+
+        const meta = document.createElement('span');
+        const stats = noteStats(note.body);
+        const tagsPart = note.tags?.length ? ` · ${note.tags.map((t) => `#${t}`).join(' ')}` : '';
+        meta.textContent = `${stats.words} words${tagsPart}`;
+
+        btn.append(title, meta);
+        btn.addEventListener('click', () => {
+          state.selectedId = note.id;
+          saveNotes();
+          render();
+        });
+        list.append(btn);
+      }
+    }
+
+    function renderPreview(body) {
+      const container = $('previewSurface');
+      container.textContent = '';
+      const blocks = parseSafeMarkdownBlocks(body);
+      if (!blocks.length) {
+        const p = document.createElement('p');
+        p.className = 'muted';
+        p.textContent = 'Nothing to preview yet.';
+        container.append(p);
+        return;
+      }
+      for (const block of blocks) {
+        if (block.type === 'heading') {
+          const el = document.createElement(`h${block.level}`);
+          el.textContent = block.text;
+          container.append(el);
+        } else if (block.type === 'code') {
+          const pre = document.createElement('pre');
+          pre.textContent = block.text;
+          container.append(pre);
+        } else if (block.type === 'quote') {
+          const bq = document.createElement('blockquote');
+          bq.textContent = block.text;
+          container.append(bq);
+        } else if (block.type === 'list') {
+          const ul = document.createElement('ul');
+          for (const item of block.items) {
+            const li = document.createElement('li');
+            li.textContent = item.kind === 'check' ? `${item.checked ? '[x]' : '[ ]'} ${item.text}` : item.text;
+            ul.append(li);
+          }
+          container.append(ul);
+        } else {
+          const p = document.createElement('p');
+          p.textContent = block.text;
+          container.append(p);
+        }
+      }
+    }
+
+    function renderEditor() {
+      const note = getSelected();
+      $('emptyEditor').hidden = Boolean(note);
+      $('editorContainer').hidden = !note;
+      $('undoBar').hidden = !state.lastDeleted;
+      if (!note) return;
+
+      if (document.activeElement !== $('noteTitleInput')) {
+        $('noteTitleInput').value = note.title;
+      }
+      if (document.activeElement !== $('noteTagsInput')) {
+        $('noteTagsInput').value = (note.tags || []).join(', ');
+      }
+      if (document.activeElement !== $('noteBodyInput')) {
+        $('noteBodyInput').value = note.body;
+      }
+
+      $('pinBtn').textContent = note.pinned ? 'Unpin' : 'Pin';
+      $('pinBtn').setAttribute('aria-pressed', String(Boolean(note.pinned)));
+      $('archiveBtn').textContent = note.archived ? 'Restore' : 'Archive';
+
+      const isPreview = state.mode === 'preview';
+      $('modeEditBtn').classList.toggle('active-tab', !isPreview);
+      $('modeEditBtn').setAttribute('aria-pressed', String(!isPreview));
+      $('modePreviewBtn').classList.toggle('active-tab', isPreview);
+      $('modePreviewBtn').setAttribute('aria-pressed', String(isPreview));
+      $('noteBodyInput').hidden = isPreview;
+      $('previewSurface').hidden = !isPreview;
+      if (isPreview) renderPreview(note.body);
+
+      const stats = noteStats(note.body);
+      $('statsLine').textContent = `${stats.words} words · ${stats.chars} chars · ${stats.minutes} min read`;
+    }
+
+    function render() {
+      $('activeTabBtn').classList.toggle('active-tab', !state.showArchived);
+      $('activeTabBtn').setAttribute('aria-pressed', String(!state.showArchived));
+      $('archiveTabBtn').classList.toggle('active-tab', state.showArchived);
+      $('archiveTabBtn').setAttribute('aria-pressed', String(state.showArchived));
+      renderTags();
+      renderList();
+      renderEditor();
+    }
+
+    function createAndSelectNote() {
+      const note = createNote({ title: '', body: '', tags: state.tag ? [state.tag] : [] });
+      state.notes.unshift(note);
+      state.selectedId = note.id;
+      state.showArchived = false;
+      state.mode = 'edit';
+      state.lastDeleted = null;
+      saveNotes('Created note locally');
+      render();
+      $('noteTitleInput').focus();
+    }
+
+    function mutateSelected(patch, statusMsg = 'Saved locally') {
+      const current = getSelected();
+      if (!current) return;
+      const updated = updateNote(current, patch);
+      state.notes = state.notes.map((n) => (n.id === current.id ? updated : n));
+      saveNotes(statusMsg);
+      renderTags();
+      renderList();
+      const stats = noteStats(updated.body);
+      $('statsLine').textContent = `${stats.words} words · ${stats.chars} chars · ${stats.minutes} min read`;
+      $('pinBtn').textContent = updated.pinned ? 'Unpin' : 'Pin';
+      $('pinBtn').setAttribute('aria-pressed', String(Boolean(updated.pinned)));
+      $('archiveBtn').textContent = updated.archived ? 'Restore' : 'Archive';
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    $('newNoteBtn').addEventListener('click', createAndSelectNote);
+    $('emptyNewBtn').addEventListener('click', createAndSelectNote);
+    $('searchInput').addEventListener('input', (e) => { state.query = e.target.value; renderList(); });
+    $('activeTabBtn').addEventListener('click', () => { state.showArchived = false; render(); });
+    $('archiveTabBtn').addEventListener('click', () => { state.showArchived = true; render(); });
+
+    $('noteTitleInput').addEventListener('input', (e) => mutateSelected({ title: e.target.value }));
+    $('noteTagsInput').addEventListener('change', (e) => mutateSelected({ tags: e.target.value }));
+    $('noteBodyInput').addEventListener('input', (e) => mutateSelected({ body: e.target.value }));
+
+    $('modeEditBtn').addEventListener('click', () => { state.mode = 'edit'; renderEditor(); });
+    $('modePreviewBtn').addEventListener('click', () => { state.mode = 'preview'; renderEditor(); });
+
+    $('pinBtn').addEventListener('click', () => {
+      const note = getSelected();
+      if (!note) return;
+      mutateSelected({ pinned: !note.pinned }, note.pinned ? 'Unpinned note' : 'Pinned note');
+    });
+
+    $('archiveBtn').addEventListener('click', () => {
+      const note = getSelected();
+      if (!note) return;
+      mutateSelected({ archived: !note.archived }, note.archived ? 'Restored note' : 'Archived note');
+      render();
+    });
+
+    $('deleteBtn').addEventListener('click', () => {
+      const note = getSelected();
+      if (!note) return;
+      state.lastDeleted = note;
+      state.notes = state.notes.filter((n) => n.id !== note.id);
+      state.selectedId = filterNotes(state.notes, { showArchived: state.showArchived })[0]?.id || null;
+      $('undoText').textContent = `Deleted "${note.title || 'Untitled Note'}".`;
+      saveNotes('Deleted note');
+      render();
+    });
+
+    $('undoDeleteBtn').addEventListener('click', () => {
+      if (!state.lastDeleted) return;
+      state.notes.unshift(state.lastDeleted);
+      state.selectedId = state.lastDeleted.id;
+      state.lastDeleted = null;
+      saveNotes('Restored deleted note');
+      render();
+    });
+
+    $('exportJsonBtn').addEventListener('click', () => {
+      downloadFile(
+        'pocket-notes-backup.json',
+        JSON.stringify({ format: 'pretend-internet.pocket-notes.v1', exportedAt: new Date().toISOString(), notes: state.notes }, null, 2),
+        'application/json'
+      );
+      $('saveStatus').textContent = `Exported ${state.notes.length} notes as JSON.`;
+    });
+
+    $('exportMdBtn').addEventListener('click', () => {
+      downloadFile('pocket-notes.md', exportNotesToMarkdown(state.notes), 'text/markdown');
+      $('saveStatus').textContent = `Exported ${state.notes.length} notes as Markdown.`;
+    });
+
+    $('importJsonBtn').addEventListener('click', () => $('importJsonInput').click());
+    $('importJsonInput').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const result = validateNotesBackup(JSON.parse(await file.text()));
+        if (result.error) {
+          $('saveStatus').textContent = result.error;
+          return;
+        }
+        const existingIds = new Set(state.notes.map((n) => n.id));
+        const incoming = result.notes.filter((n) => !existingIds.has(n.id));
+        state.notes = [...incoming, ...state.notes];
+        if (!state.selectedId && state.notes[0]) state.selectedId = state.notes[0].id;
+        saveNotes(`Imported ${incoming.length} notes from backup.`);
+        render();
+      } catch {
+        $('saveStatus').textContent = 'Could not read backup JSON file.';
+      }
+    });
+
+    $('skinToggleBtn').addEventListener('click', toggleSkin);
+    $('helpBtn').addEventListener('click', () => { $('helpModal').hidden = false; $('closeHelpBtn').focus(); });
+    $('closeHelpBtn').addEventListener('click', () => { $('helpModal').hidden = true; });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') $('helpModal').hidden = true;
+    });
+
+    loadSkin();
+    loadNotes();
+    if (!state.selectedId && state.notes.length) {
+      state.selectedId = filterNotes(state.notes)[0]?.id || null;
+    }
+    render();
+  </script>
+</body>
+</html>

@@ -3,62 +3,970 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#181017">
-  <title>Pretend Internet · Mini-App Workbench</title>
+  <meta name="theme-color" content="#000000">
+  <title>Pretend Internet</title>
+  <meta name="description" content="A local-first, browsable world of independent offline mini-apps, readers, notebooks, launchers, and metadata-only nsite tools.">
+  <meta property="og:title" content="Pretend Internet">
+  <meta property="og:description" content="A local-first, browsable world of independent offline mini-apps, readers, notebooks, launchers, and metadata-only nsite tools.">
   <style>
     :root {
       color-scheme: dark;
-      --app-bg: #181017;
-      --surface: #271d28;
-      --surface-2: #342532;
-      --text: #ffeaf3;
-      --muted: #d2b2c1;
-      --accent: #f0589c;
-      --border: #644355;
-      --focus: #ffcae1;
-      --radius: 18px;
-      --space: 8px;
+      --bg: #000000;
+      --surface: #111111;
+      --surface-2: #1A1A1A;
+      --border: #5E5E5E;
+      --border-strong: #B8B8B8;
+      --text: #ffffff;
+      --muted: #B8B8B8;
+      --accent: #ff1493;
+      --on-accent: #000000;
+      --accent-soft: #FFB6D9;
+      --focus: #ffffff;
+      --font: 'Plus Jakarta Sans', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+      --mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
     }
+
+    [data-skin="daylight"] {
+      color-scheme: light;
+      --bg: #FFFFFF;
+      --surface: #ffffff;
+      --surface-2: #C0C0C0;
+      --border: #B8B8B8;
+      --border-strong: #5E5E5E;
+      --text: #000000;
+      --muted: #5E5E5E;
+      --accent: #CD0D72;
+      --on-accent: #ffffff;
+      --accent-soft: #9A0957;
+      --focus: #000000;
+    }
+
     * { box-sizing: border-box; }
-    body { margin: 0; min-width: 280px; min-height: 100dvh; background: var(--app-bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-    main { max-width: 560px; margin: 0 auto; }
-    .eyebrow { font-size: .75rem; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); font-weight: 800; }
-    h1 { font-size: clamp(1.7rem, 8vw, 2.4rem); line-height: 1.15; margin: 10px 0 12px; }
-    h2 { font-size: 1.15rem; margin: 0; }
-    p { margin: 8px 0 0; }
+    html, body {
+      margin: 0;
+      min-width: 280px;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.55 var(--font);
+    }
+
+    a { color: var(--accent-soft); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button, input { font: inherit; color: inherit; }
+
+    button, a.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 44px;
+      padding: 9px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-2);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-decoration: none;
+      transition: border-color 150ms ease, background-color 150ms ease, transform 120ms ease;
+    }
+    button:hover, a.btn:hover { border-color: var(--accent); text-decoration: none; }
+    button:active, a.btn:active { transform: scale(0.98); }
+    button.primary, a.btn.primary {
+      background: var(--accent);
+      color: var(--on-accent);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    /* Strict 3-zone top bar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+      padding: 10px max(24px, env(safe-area-inset-right)) 10px max(24px, env(safe-area-inset-left));
+    }
+    .brand {
+      font-size: 1.1rem;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .brand span { color: var(--accent); }
+    .topnav {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .topnav a, .topnav button.nav-link {
+      background: none;
+      border: 0;
+      padding: 8px 2px;
+      min-height: 44px;
+      color: var(--muted);
+      font-weight: 600;
+      border-radius: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .topnav a:hover, .topnav button.nav-link:hover {
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 6px;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 36px max(24px, env(safe-area-inset-right)) 72px max(24px, env(safe-area-inset-left));
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      gap: 32px;
+      align-items: end;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(2.1rem, 4.4vw, 3.25rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      text-wrap: balance;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 62ch;
+      font-size: 1.02rem;
+    }
+    .hero-meta-box {
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .hero-meta-box h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .hero-meta-box p {
+      font-size: 0.9rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .section {
+      margin-top: 44px;
+    }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: -0.01em;
+    }
     .muted { color: var(--muted); }
-    .card, details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 24px; }
-    .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .status { display: inline-block; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; font-size: .8rem; }
-    a.open { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #180b15; font-weight: 750; text-decoration: none; min-height: 48px; border-radius: 12px; padding: 10px 20px; margin-top: 18px; }
-    a:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
-    details { padding: 0; }
-    summary { min-height: 48px; padding: 16px 20px; cursor: pointer; font-weight: 700; }
-    details p { margin: 0 20px 20px; }
-    small { color: var(--muted); }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+    .meta-text {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Filter & search toolbar */
+    .filter-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .search-box {
+      flex: 1 1 260px;
+      max-width: 420px;
+    }
+    .search-box input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+    }
+    .segmented {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      flex-wrap: wrap;
+    }
+    .segmented button {
+      min-height: 36px;
+      padding: 6px 12px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.88rem;
+      border-radius: 8px;
+    }
+    .segmented button[aria-pressed="true"] {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--accent);
+    }
+
+    /* Places grid */
+    .places-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .place-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .place-kicker {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .place-kicker .accent-label {
+      color: var(--accent-soft);
+      font-weight: 600;
+    }
+    .place-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+      line-height: 1.25;
+    }
+    .place-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+    .place-evidence {
+      margin-top: 12px !important;
+      font-size: 0.82rem !important;
+      font-family: var(--mono);
+      color: var(--muted);
+    }
+    .place-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Recent strip */
+    .recent-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 0.9rem;
+    }
+    .recent-strip a {
+      font-weight: 600;
+    }
+
+    /* Personal shelf */
+    .shelf-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .panel {
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .panel h3 { margin: 0 0 8px; font-size: 1.1rem; }
+    .field { margin-top: 12px; }
+    .field label {
+      display: block;
+      font-size: 0.86rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    .field input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+    }
+    .bookmark-list {
+      list-style: none;
+      margin: 14px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .bookmark-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .bookmark-row strong { display: block; font-size: 0.96rem; }
+    .bookmark-row small { color: var(--muted); display: block; word-break: break-all; }
+
+    /* Workstreams table/list */
+    .workstream-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .ws-item {
+      padding: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .ws-item h3 { margin: 0 0 6px; font-size: 1rem; }
+    .ws-item h3 span { color: var(--accent); font-family: var(--mono); margin-right: 6px; }
+    .ws-item p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    /* Quick-Switch Drawer & Help Modal */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: rgba(0, 0, 0, 0.78);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .drawer {
+      width: min(400px, 92vw);
+      height: 100%;
+      background: var(--surface);
+      border-left: 1px solid var(--border-strong);
+      padding: 24px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer-head h2 { margin: 0; font-size: 1.2rem; }
+    .drawer-link {
+      display: block;
+      padding: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+    }
+    .drawer-link:hover { border-color: var(--accent); text-decoration: none; }
+    .drawer-link strong { display: block; font-size: 1rem; margin-bottom: 3px; }
+    .drawer-link span { display: block; font-size: 0.83rem; color: var(--muted); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 620px;
+      max-height: 88dvh;
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .modal-card h2 { margin: 0 0 12px; }
+    .status-msg { min-height: 1.4em; font-size: 0.9rem; color: var(--accent-soft); margin: 10px 0 0; }
+    [hidden] { display: none !important; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 1000px) {
+      .places-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero, .shelf-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .topbar-inner { gap: 8px; padding: 8px 14px; }
+      .brand { font-size: 1rem; }
+      .topnav { gap: 10px; }
+      .topnav a { display: none; }
+      button, a.btn { padding: 8px 12px; font-size: 0.9rem; }
+      main { padding: 24px 16px 56px; }
+      .places-grid { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <div class="eyebrow">Pretend Internet / Development shelf</div>
-  <h1>Little apps. Their own rules. One tidy home.</h1>
-  <p class="muted">This is the development launcher, not a finished collection. Only the working example below is included in this first frontend build.</p>
-
-  <section class="card" aria-labelledby="example-title">
-    <div class="header">
-      <h2 id="example-title">Pocket Counter</h2>
-      <span class="status">Example · WIP</span>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#places">Pretend <span>Internet</span></a>
+      <nav class="topnav" aria-label="Main navigation">
+        <a href="#places">Places</a>
+        <a href="#shelf">My Shelf</a>
+        <a href="#workstreams">Workstreams</a>
+        <button type="button" class="nav-link" id="helpOpenBtn">Help</button>
+      </nav>
+      <button type="button" class="primary" id="drawerOpenBtn">Open drawer</button>
     </div>
-    <p class="muted">Count up or down, switch between two skins, and open in-app Help. It works offline and stores its count locally when browser storage is available.</p>
-    <a class="open" href="./templates/mini-app/index.html">Open example →</a>
-  </section>
+  </header>
 
-  <details>
-    <summary>What is this app?</summary>
-    <p>This is a small test of the Pretend Internet mini-app rules: every app should explain itself, work independently, and support different skins without changing its behavior. It does not connect to public networks or include unfinished Library projects. An installed Android APK has not yet been verified.</p>
-  </details>
-  <p style="margin-top:24px"><small>No account, server, or device permissions are required for this launcher.</small></p>
-</main>
+  <main>
+    <section class="hero" aria-labelledby="heroTitle">
+      <div>
+        <h1 id="heroTitle">A small local world of real, reachable places.</h1>
+        <p>Explore independent offline tools—a chapter reader, a local notebook, a metadata-only nsite directory, a folder launcher, and an archive viewer. Every place runs directly in your browser with its own Help, honest status, and local persistence.</p>
+      </div>
+      <div class="hero-meta-box">
+        <h2>Find · Open · Use · Keep · Return</h2>
+        <p>No accounts, mandatory servers, or background site scraping. Switch appearance without changing how any app works.</p>
+        <div class="hero-actions">
+          <button type="button" id="skinToggleBtn">Switch to Daylight</button>
+          <a class="btn" href="./apps/pocket-reader/index.html">Open Reader</a>
+          <a class="btn" href="./apps/pocket-notes/index.html">Open Notes</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="places" aria-labelledby="placesHeading">
+      <div class="section-head">
+        <h2 id="placesHeading">Places in this workspace</h2>
+        <span class="meta-text" id="placesCount">6 places</span>
+      </div>
+
+      <div id="recentStrip" class="recent-strip" hidden aria-label="Recently visited places"></div>
+
+      <div class="filter-toolbar">
+        <div class="search-box">
+          <label class="sr-only" for="placeSearch">Search places</label>
+          <input type="search" id="placeSearch" placeholder="Search places, tools, or status..." autocomplete="off">
+        </div>
+        <div class="segmented" role="group" aria-label="Filter places by category">
+          <button type="button" data-cat="all" aria-pressed="true">All</button>
+          <button type="button" data-cat="everyday" aria-pressed="false">Everyday</button>
+          <button type="button" data-cat="protocol" aria-pressed="false">Metadata</button>
+          <button type="button" data-cat="launcher" aria-pressed="false">Launcher</button>
+          <button type="button" data-cat="archive" aria-pressed="false">Archive</button>
+          <button type="button" data-cat="template" aria-pressed="false">Template</button>
+          <button type="button" data-cat="pinned" aria-pressed="false">Pinned</button>
+        </div>
+      </div>
+
+      <div id="placesGrid" class="places-grid">
+        <article class="place-card">
+          <div>
+            <div class="place-kicker"><span class="accent-label">Template</span> · wip</div>
+            <h3>Pocket Counter</h3>
+            <p>Minimal offline mini-app template demonstrating semantic skins, in-app Help, and local storage persistence.</p>
+          </div>
+          <div class="place-actions">
+            <a class="btn primary" href="./templates/mini-app/index.html">Open</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="shelf" aria-labelledby="shelfHeading">
+      <div class="section-head">
+        <h2 id="shelfHeading">My Local Shelf</h2>
+        <span class="meta-text" id="bookmarkCount">0 saved bookmarks</span>
+      </div>
+
+      <div class="shelf-grid">
+        <form class="panel" id="bookmarkForm" novalidate>
+          <h3>Save a place to return to</h3>
+          <p class="meta-text">Add relative paths (like <code>./apps/pocket-reader/index.html</code>) or web links. Saved only in this browser's <code>localStorage</code>.</p>
+          <div class="field">
+            <label for="bmTitle">Title</label>
+            <input type="text" id="bmTitle" placeholder="My reading list" required>
+          </div>
+          <div class="field">
+            <label for="bmUrl">Path or URL</label>
+            <input type="text" id="bmUrl" placeholder="./apps/pocket-reader/index.html" required>
+          </div>
+          <div class="field">
+            <label for="bmNote">Short note (optional)</label>
+            <input type="text" id="bmNote" placeholder="Chapter 2 notes">
+          </div>
+          <p class="status-msg" id="bookmarkStatus" role="status" aria-live="polite"></p>
+          <div class="hero-actions" style="margin-top:14px">
+            <button type="submit" class="primary">Save bookmark</button>
+            <button type="button" id="exportBookmarksBtn">Export JSON</button>
+          </div>
+        </form>
+
+        <div class="panel">
+          <h3>Saved bookmarks</h3>
+          <p class="meta-text" id="bookmarksHint">Empty by default. Bookmarks you add stay on this device.</p>
+          <ul class="bookmark-list" id="bookmarkList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="workstreams" aria-labelledby="wsHeading">
+      <div class="section-head">
+        <h2 id="wsHeading">Portfolio workstreams</h2>
+        <span class="meta-text">Independent threads · not a compulsory build sequence</span>
+      </div>
+      <div id="workstreamsGrid" class="workstream-grid"></div>
+    </section>
+
+    <footer>
+      <span>Pretend Internet · Local-first portfolio · Zero remote nsite scraping (PI-04)</span>
+      <span><a href="./templates/mini-app/index.html">Pocket Counter template</a> · <a href="./apps/folder-launcher/web2app/index.html">Folder Launcher</a></span>
+    </footer>
+  </main>
+
+  <div id="drawerOverlay" class="overlay" hidden>
+    <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="drawer-head">
+        <h2 id="drawerTitle">Quick-Switch Drawer</h2>
+        <button type="button" id="drawerCloseBtn" aria-label="Close drawer">Close</button>
+      </div>
+      <p class="meta-text">Every place below is independently runnable. This drawer is an optional doorway, not a mandatory host.</p>
+      <div id="drawerLinks"></div>
+    </aside>
+  </div>
+
+  <div id="helpModal" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">What is Pretend Internet?</h2>
+      <p><strong>What this is:</strong> A local-first portfolio home connecting independent offline mini-apps and tools. Each place works on its own without requiring an account, wallet, or server.</p>
+      <p><strong>How to begin:</strong> Browse or search the Places grid, open any app (such as <em>Pocket Reader</em>, <em>Pocket Notes</em>, or <em>Nsite Directory</em>), save your work locally, and return later via your pinned places or recent strip.</p>
+      <p><strong>What is functional vs. untested:</strong> Browser runtime, unit tests, and local persistence are verified for the web apps here. Status labels distinguish <code>testing</code> (browser-tested), <code>wip</code> (template), and <code>live</code> (Folder Launcher's owner-attested Android APK; this page opens its HTML fallback). No full portfolio Android APK has been verified.</p>
+      <p><strong>Discovery boundary (PI-04):</strong> The Nsite Directory inspects Nostr event metadata only and never automatically fetches remote HTML, assets, ZIPs, or screenshots.</p>
+      <p><strong>Where your data goes:</strong> Skin choice, pins, recent visits, and personal shelf bookmarks stay strictly in this browser's <code>localStorage</code>. Nothing is sent over a network.</p>
+      <button type="button" class="primary" id="helpCloseBtn">Close help</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      PLACES,
+      WORKSTREAMS,
+      filterPlaces,
+      createBookmark,
+      togglePinned,
+      recordRecentVisit,
+    } from './portal-core.mjs';
+
+    const STATE_KEY = 'pretend-internet:portal:v1';
+    const SKIN_KEY = 'pretend-internet:skin';
+    const $ = (id) => document.getElementById(id);
+
+    let state = {
+      query: '',
+      category: 'all',
+      pinnedIds: [],
+      recentVisits: [],
+      bookmarks: [],
+    };
+
+    function loadSkin() {
+      try {
+        const isDaylight = localStorage.getItem(SKIN_KEY) === 'daylight';
+        document.documentElement.dataset.skin = isDaylight ? 'daylight' : '';
+        $('skinToggleBtn').textContent = isDaylight ? 'Switch to Dark' : 'Switch to Daylight';
+      } catch { /* ignore */ }
+    }
+
+    function toggleSkin() {
+      const next = document.documentElement.dataset.skin === 'daylight' ? 'dark' : 'daylight';
+      document.documentElement.dataset.skin = next === 'daylight' ? 'daylight' : '';
+      $('skinToggleBtn').textContent = next === 'daylight' ? 'Switch to Dark' : 'Switch to Daylight';
+      try { localStorage.setItem(SKIN_KEY, next); } catch { /* ignore */ }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.pinnedIds)) state.pinnedIds = parsed.pinnedIds;
+        if (Array.isArray(parsed.recentVisits)) state.recentVisits = parsed.recentVisits;
+        if (Array.isArray(parsed.bookmarks)) state.bookmarks = parsed.bookmarks;
+      } catch { /* ignore */ }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STATE_KEY, JSON.stringify({
+          pinnedIds: state.pinnedIds,
+          recentVisits: state.recentVisits,
+          bookmarks: state.bookmarks,
+        }));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function renderRecent() {
+      const strip = $('recentStrip');
+      strip.textContent = '';
+      const valid = state.recentVisits
+        .map((v) => PLACES.find((p) => p.id === v.id))
+        .filter(Boolean);
+      strip.hidden = valid.length === 0;
+      if (!valid.length) return;
+
+      const label = document.createElement('span');
+      label.className = 'muted';
+      label.textContent = 'Recently opened:';
+      strip.append(label);
+
+      valid.forEach((place, i) => {
+        if (i > 0) {
+          const sep = document.createElement('span');
+          sep.className = 'muted';
+          sep.setAttribute('aria-hidden', 'true');
+          sep.textContent = '·';
+          strip.append(sep);
+        }
+        const a = document.createElement('a');
+        a.href = place.href;
+        a.textContent = place.name;
+        strip.append(a);
+      });
+    }
+
+    function renderPlaces() {
+      const filtered = filterPlaces(PLACES, {
+        query: state.query,
+        category: state.category,
+        pinnedIds: state.pinnedIds,
+      });
+
+      $('placesCount').textContent = `${filtered.length} of ${PLACES.length} places`;
+      const grid = $('placesGrid');
+      grid.textContent = '';
+
+      if (!filtered.length) {
+        const empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = state.category === 'pinned'
+          ? 'No pinned places yet. Click Pin on any place card to keep it near the top.'
+          : `No places match "${state.query}".`;
+        grid.append(empty);
+        return;
+      }
+
+      for (const place of filtered) {
+        const isPinned = state.pinnedIds.includes(place.id);
+        const card = document.createElement('article');
+        card.className = 'place-card';
+
+        const top = document.createElement('div');
+        const kicker = document.createElement('div');
+        kicker.className = 'place-kicker';
+        const catSpan = document.createElement('span');
+        catSpan.className = 'accent-label';
+        catSpan.textContent = place.categoryLabel;
+        kicker.append(catSpan, ` · ${place.status} · ${place.storage}`);
+
+        const h3 = document.createElement('h3');
+        h3.textContent = place.name;
+
+        const desc = document.createElement('p');
+        desc.textContent = place.summary;
+
+        const ev = document.createElement('p');
+        ev.className = 'place-evidence';
+        ev.textContent = place.evidence;
+
+        top.append(kicker, h3, desc, ev);
+
+        const actions = document.createElement('div');
+        actions.className = 'place-actions';
+
+        const openLink = document.createElement('a');
+        openLink.className = 'btn primary';
+        openLink.href = place.href;
+        openLink.textContent = `Open ${place.name}`;
+        openLink.addEventListener('click', () => {
+          state.recentVisits = recordRecentVisit(state.recentVisits, place.id);
+          saveState();
+        });
+
+        const pinBtn = document.createElement('button');
+        pinBtn.type = 'button';
+        pinBtn.setAttribute('aria-pressed', String(isPinned));
+        pinBtn.setAttribute('aria-label', `${isPinned ? 'Unpin' : 'Pin'} ${place.name}`);
+        pinBtn.textContent = isPinned ? 'Pinned' : 'Pin';
+        pinBtn.addEventListener('click', () => {
+          state.pinnedIds = togglePinned(state.pinnedIds, place.id);
+          saveState();
+          renderPlaces();
+        });
+
+        actions.append(openLink, pinBtn);
+        card.append(top, actions);
+        grid.append(card);
+      }
+    }
+
+    function renderBookmarks() {
+      const list = $('bookmarkList');
+      list.textContent = '';
+      $('bookmarkCount').textContent = `${state.bookmarks.length} saved ${state.bookmarks.length === 1 ? 'bookmark' : 'bookmarks'}`;
+      $('bookmarksHint').hidden = state.bookmarks.length > 0;
+
+      for (const bm of state.bookmarks) {
+        const li = document.createElement('li');
+        li.className = 'bookmark-row';
+
+        const info = document.createElement('div');
+        const link = document.createElement('a');
+        link.href = bm.url;
+        const strong = document.createElement('strong');
+        strong.textContent = bm.title;
+        link.append(strong);
+        const detail = document.createElement('small');
+        detail.textContent = bm.note ? `${bm.note} · ${bm.url}` : bm.url;
+        info.append(link, detail);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.setAttribute('aria-label', `Remove bookmark ${bm.title}`);
+        removeBtn.addEventListener('click', () => {
+          state.bookmarks = state.bookmarks.filter((item) => item.id !== bm.id);
+          const persisted = saveState();
+          renderBookmarks();
+          $('bookmarkStatus').textContent = persisted
+            ? `Removed "${bm.title}".`
+            : `Removed "${bm.title}" for this session only. Local storage is unavailable.`;
+        });
+
+        li.append(info, removeBtn);
+        list.append(li);
+      }
+    }
+
+    function renderWorkstreams() {
+      const grid = $('workstreamsGrid');
+      grid.textContent = '';
+      for (const ws of WORKSTREAMS) {
+        const card = document.createElement('article');
+        card.className = 'ws-item';
+        const h3 = document.createElement('h3');
+        const code = document.createElement('span');
+        code.textContent = `${ws.code}. `;
+        h3.append(code, ws.name);
+        const p = document.createElement('p');
+        p.textContent = ws.focus;
+        card.append(h3, p);
+        grid.append(card);
+      }
+    }
+
+    function renderDrawer() {
+      const box = $('drawerLinks');
+      box.textContent = '';
+      for (const place of PLACES) {
+        const a = document.createElement('a');
+        a.className = 'drawer-link';
+        a.href = place.href;
+        const strong = document.createElement('strong');
+        strong.textContent = place.name;
+        const span = document.createElement('span');
+        span.textContent = `${place.categoryLabel} · ${place.status} · ${place.summary}`;
+        a.append(strong, span);
+        a.addEventListener('click', () => {
+          state.recentVisits = recordRecentVisit(state.recentVisits, place.id);
+          saveState();
+        });
+        box.append(a);
+      }
+    }
+
+    // Event listeners
+    $('placeSearch').addEventListener('input', (e) => {
+      state.query = e.target.value;
+      renderPlaces();
+    });
+
+    document.querySelectorAll('.segmented button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.category = btn.dataset.cat || 'all';
+        document.querySelectorAll('.segmented button').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+        renderPlaces();
+      });
+    });
+
+    $('bookmarkForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const result = createBookmark({
+        title: $('bmTitle').value,
+        url: $('bmUrl').value,
+        note: $('bmNote').value,
+      });
+      if (result.error) {
+        $('bookmarkStatus').textContent = result.error;
+        return;
+      }
+      state.bookmarks.unshift(result.bookmark);
+      const persisted = saveState();
+      $('bmTitle').value = '';
+      $('bmUrl').value = '';
+      $('bmNote').value = '';
+      $('bookmarkStatus').textContent = persisted
+        ? `Saved "${result.bookmark.title}" to your local shelf.`
+        : `Added "${result.bookmark.title}" for this session only. Local storage is unavailable.`;
+      renderBookmarks();
+    });
+
+    $('exportBookmarksBtn').addEventListener('click', () => {
+      const blob = new Blob(
+        [JSON.stringify({ format: 'pretend-internet.shelf.v1', exportedAt: new Date().toISOString(), bookmarks: state.bookmarks, pinnedIds: state.pinnedIds }, null, 2)],
+        { type: 'application/json' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pretend-internet-shelf.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      $('bookmarkStatus').textContent = `Exported ${state.bookmarks.length} bookmarks to JSON.`;
+    });
+
+    $('skinToggleBtn').addEventListener('click', toggleSkin);
+
+    $('drawerOpenBtn').addEventListener('click', () => {
+      renderDrawer();
+      $('drawerOverlay').hidden = false;
+      $('drawerCloseBtn').focus();
+    });
+    $('drawerCloseBtn').addEventListener('click', () => {
+      $('drawerOverlay').hidden = true;
+      $('drawerOpenBtn').focus();
+    });
+    $('drawerOverlay').addEventListener('click', (e) => {
+      if (e.target === $('drawerOverlay')) $('drawerOverlay').hidden = true;
+    });
+
+    $('helpOpenBtn').addEventListener('click', () => {
+      $('helpModal').hidden = false;
+      $('helpCloseBtn').focus();
+    });
+    $('helpCloseBtn').addEventListener('click', () => {
+      $('helpModal').hidden = true;
+      $('helpOpenBtn').focus();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        $('drawerOverlay').hidden = true;
+        $('helpModal').hidden = true;
+      }
+    });
+
+    loadSkin();
+    loadState();
+    renderRecent();
+    renderPlaces();
+    renderBookmarks();
+    renderWorkstreams();
+  </script>
 </body>
 </html>
