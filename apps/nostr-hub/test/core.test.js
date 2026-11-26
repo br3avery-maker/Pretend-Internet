@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { zipSync, strToU8 } from 'fflate';
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+import { publicMutes, visibility } from '../src/lib/moderation.js';
 import { groupSites, safePath, siteURL } from '../src/lib/model.js';
 import { chaptersFromMarkdown } from '../src/lib/text.js';
 import { execute, publicationHistory, siteFiles, uploadVerified } from '../src/lib/publisher.js';
@@ -162,4 +163,26 @@ test('an interrupted upload can resume even after an older completed publication
   const history = await publicationHistory(author, draft, [], [old, pending]);
   assert.equal(history.previous.id, 'pending');
   assert.equal(history.latestTimestamp, 1);
+});
+
+
+test('signed public mute lists isolate owners, retain safe exceptions, and require the full campaign signature', () => {
+  const key = generateSecretKey(), owner = getPublicKey(key);
+  const other = generateSecretKey(), foreign = getPublicKey(other);
+  const muted = 'b'.repeat(64);
+  const signed = (secret, time, tags) => finalizeEvent({kind:10000, created_at:time, content:'', tags}, secret);
+  const old = signed(key, 1, [['p',foreign]]);
+  const current = signed(key, 2, [['p',muted], ['e','f'.repeat(64)], ['p','invalid']]);
+  const unrelated = signed(other, 3, [['p',owner]]);
+  const tampered = {...signed(key,4,[['p',foreign]]), content:'changed'};
+  const mutes = publicMutes([old,current,unrelated,tampered],owner);
+  assert.deepEqual([...mutes.publishers],[muted]);
+  assert.equal(visibility({kind:36787,pubkey:muted,tags:[]},{mutes}), 'Public signed mute list');
+  assert.equal(visibility({kind:36787,pubkey:muted,tags:[]},{mutes,safe:[muted]}),'');
+  assert.equal(visibility({kind:36787,pubkey:muted,tags:[]},{mutes,safe:[muted],hidden:[muted]}),'Locally hidden publisher');
+  const site = {kind:35128,pubkey:foreign,tags:[['d','campaign'],['description','Independent web researcher sharing curated resources at promo-example.com']]};
+  assert.equal(visibility(site,{mutes}),'Confirmed campaign signature');
+  assert.equal(visibility(site,{mutes,approved:[`35128:${foreign}:campaign`]}),'');
+  assert.equal(visibility({...site,tags:[['description','Independent web researcher studying telescope optics.']]},{mutes}),'');
+  assert.equal(visibility({kind:30023,pubkey:foreign,tags:[],id:'f'.repeat(64)},{mutes}),'Public signed mute list');
 });

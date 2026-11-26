@@ -2,6 +2,7 @@ import { button, el, heading, icon, label, link, modal, muted, query, route, run
 import { groupSites, kinds, matchesWords, siteURL, tag } from '../lib/model.js';
 import { cached, npub, parseKey, preferences, profileDirectory, refreshIdentity, reloadCatalog, shortKey } from '../lib/nostr.js';
 import { saveCollections, setting, toggleList } from '../lib/store.js';
+import { moderation } from '../lib/moderation.js';
 
 const siteKinds = [kinds.root, kinds.site];
 const siteLink = site => siteURL(site.event.pubkey, site.slug, npub(site.event.pubkey));
@@ -31,17 +32,22 @@ async function catalog(main, arcade) {
   let sites = [];
   let profiles = new Map();
   let best;
+  let excluded = () => '';
   function draw() {
-    const hidden = setting('hidden-publishers', []);
     const favorites = setting('saved-sites', []);
     const filtered = sites.filter(site => (!arcade || isGame(site))
-      && (showHidden.checked ? hidden.includes(site.event.pubkey) : !hidden.includes(site.event.pubkey))
+      && (showHidden.checked ? Boolean(excluded(site.event)) : !excluded(site.event))
       && (!saved.checked || favorites.includes(site.address))
       && matchesWords(filter.value, site.title, site.description, site.topics, profiles.get(site.event.pubkey)?.name, site.slug));
-    results.replaceChildren(...filtered.map(site => siteRow(site, profiles.get(site.event.pubkey)?.name || shortKey(site.event.pubkey), arcade, best)));
+    results.replaceChildren(...filtered.map(site => {
+      const row = siteRow(site, profiles.get(site.event.pubkey)?.name || shortKey(site.event.pubkey), arcade, best);
+      if (showHidden.checked) row.append(muted(excluded(site.event)));
+      return row;
+    }));
     if (!filtered.length) results.append(muted(sites.length ? 'No matches for these filters.' : 'Refresh to look up public publications. Previously discovered results are available offline.'));
   }
   async function load() {
+    excluded = await moderation();
     sites = groupSites(await cached(siteKinds, author));
     profiles = await profileDirectory();
     if (arcade && author) {
@@ -53,6 +59,8 @@ async function catalog(main, arcade) {
   }
   refresh.addEventListener('click', run(refresh, notice, async () => {
     setStatus(notice, 'Reading signed publication metadata.');
+    const active = setting('account', '');
+    if (active) await refreshIdentity(active);
     const result = await reloadCatalog(arcade && author ? [...siteKinds, kinds.appData] : siteKinds, author);
     await load();
     setStatus(notice, result.reached ? `${result.count} signed events returned by ${result.reached} relays.` : 'No relays completed the query. Showing cached results.');
@@ -92,7 +100,13 @@ async function project(main) {
   const hidden = button(setting('hidden-publishers', []).includes(site.event.pubkey) ? 'Show this publisher' : 'Hide all from this publisher', () => {
     const state = toggleList('hidden-publishers', site.event.pubkey);
     hidden.textContent = state ? 'Show this publisher' : 'Hide all from this publisher';
-    setStatus(message, state ? 'Publisher hidden from Discover and Arcade.' : 'Publisher visible again.');
+    setStatus(message, state ? 'Publisher hidden from Discover, Arcade, Writing and Music.' : 'Publisher visible again.');
+  });
+  const excluded = await moderation();
+  const reason = excluded(site.event);
+  const approved = button(setting('approved-publications', []).includes(site.address) ? 'Remove approval' : 'Approve this publication', () => {
+    approved.textContent = toggleList('approved-publications', site.address) ? 'Remove approval' : 'Approve this publication';
+    setStatus(message, 'Local publication approval updated.');
   });
   const collectionName = el('input', { list: 'collection-names', required: true, maxlength: 60 });
   const collectionForm = el('form', {},
@@ -115,7 +129,8 @@ async function project(main) {
     muted(`Published by ${publisher}`), site.description && el('p', {}, site.description),
     el('div', { class: 'row' }, url ? el('a', { class: 'button primary', href: url, target: '_blank', rel: 'noopener noreferrer' }, isGame(site) ? 'Play' : 'Open site') : muted('This site uses an address the configured gateway cannot open.'),
       setting('publishing-account')?.pubkey === site.event.pubkey && link('Update nsite', route('publish', { site: site.address }), 'button'),
-      favorite, button('Add to collection', () => picker.showModal()), hidden),
+      favorite, button('Add to collection', () => picker.showModal()), hidden, approved),
+    reason && muted('Filtered: ' + reason),
     message, el('h2', {}, 'Observed versions'), el('ul', { class: 'stack-tight' },
       site.versions.map(event => el('li', {}, new Date(event.created_at * 1000).toLocaleDateString(), ' · ', el('code', {}, event.id)))),
     el('details', {}, el('summary', {}, 'Declared files'), el('ul', {}, site.event.tags.filter(parts => parts[0] === 'path').map(parts => el('li', {}, parts[1])))));

@@ -2,6 +2,8 @@ import { button, el, heading, label, link, modal, muted, query, run, setStatus, 
 import { bootstrap, endpoints, npub, parseKey, preferences, refreshIdentity, shortKey, transport } from '../lib/nostr.js';
 import { kinds } from '../lib/model.js';
 import { saveAccount, setting, setSetting } from '../lib/store.js';
+import { cached } from '../lib/nostr.js';
+import { publicMutes } from '../lib/moderation.js';
 import { accountSignIn } from './account-signin.js';
 
 function list(values, empty) {
@@ -83,10 +85,36 @@ async function profiles(main) {
       el('div', { class: 'row' }, more, active !== key && button('Use profile', () => { saveAccount(key); location.reload(); })));
   }));
   const signIn = accountSignIn();
+  const moderationUI = el('section', { class: 'stack' }, el('h2', {}, 'Content visibility'),
+    muted('Manual hidden publishers are device-wide. Public signed mute lists follow the browsing profile, not the publishing signer. Approved publishers override public mutes; manual hiding takes precedence. Private encrypted mute tags are not read.'));
+  const mutes = publicMutes(active ? await cached([kinds.muteList], active) : [], active);
+  moderationUI.append(muted(mutes.publishers.size + ' public muted publishers; ' + mutes.events.size + ' muted events.'));
+  for (const [key, title] of [['hidden-publishers','Locally hidden publishers'], ['safe-publishers','Approved publishers']]) {
+    const input = el('textarea', { rows: 3, spellcheck: 'false' }, setting(key, []).map(npub).join('\n'));
+    const feedback = status();
+    const submit = el('button', { class: 'secondary' }, 'Save ' + title.toLowerCase());
+    const form = el('form', {}, label(title, input), submit, feedback);
+    form.addEventListener('submit', run(submit, feedback, async () => {
+      const values = [...new Set(input.value.trim().split(/\s+/).filter(Boolean).map(parseKey))];
+      setSetting(key, values);
+      setStatus(feedback, 'Saved on this device.');
+    }));
+    moderationUI.append(form);
+  }
+  if (active) {
+    const feedback = status();
+    const refresh = el('button', { type: 'button' }, 'Refresh public mute list');
+    refresh.addEventListener('click', run(refresh, feedback, async () => {
+      const result = await refreshIdentity(active);
+      if (!result.relays.some(row => ['complete','limited'].includes(row.status))) throw new Error('No relay completed the lookup. Keeping cached signed lists.');
+      await profiles(main);
+    }));
+    moderationUI.append(refresh, feedback);
+  }
   main.replaceChildren(heading('Profile'), signIn,
     el('h2', {}, 'Browse other profiles'), ...(current?.profile.banner ? [el('img', { class: 'profile-banner', src: current.profile.banner, alt: '', referrerpolicy: 'no-referrer' })] : []),
     ...entries, active && button('Browse without a profile', () => { setSetting('account', ''); location.reload(); }),
-    form);
+    form, moderationUI);
   if (query.has('signin')) signIn.focus();
 }
 export function render(main, page) { return page === 'network' ? network(main) : profiles(main); }

@@ -46,6 +46,8 @@ const events = [
   sign(10002, '', [['r','wss://relay.ditto.pub']]),
   sign(10063, '', [['server','https://blossom.fixture.example']]),
   sign(35128, '', [['d','test-arcade'],['title','Test arcade'],['description','A game in the arcade'],['path','/index.html','d'.repeat(64)]]),
+  sign(10000, '', [['p',pubkey]], another),
+  sign(30023, 'Other profile article', [['d','other'],['title','Other profile article']], another),
   sign(30023, '# Example article\n\nThis article came from a signed event.', [['d','article'],['title','Example article']]),
   sign(36787, '', [['d','track'],['title','Fixture song'],['artist','Fixture artist'],['url','https://media.fixture.example/fixture.wav']]),
   sign(36787, '', [['d','second'],['title','Second fixture song'],['url','https://media.fixture.example/fixture.wav']]),
@@ -209,6 +211,18 @@ try {
   await page.getByText('Relay check complete.').waitFor();
   assert.ok(await page.getByRole('list',{name:'Relay check results'}).getByText('Responded',{exact:false}).count());
 
+  await open('writing.html');
+  await button('Find writing').click();
+  await link('Example article',false).waitFor();
+  await open('profile.html');
+  await page.locator('article').filter({hasText:'Second Profile'}).getByRole('button',{name:'Use profile'}).click();
+  await open('writing.html');
+  await button('Find writing').click();
+  await link('Other profile article',false).waitFor();
+  assert.equal(await link('Example article',false).count(),0);
+  await open('profile.html');
+  await page.getByText('1 public muted publishers; 0 muted events.').waitFor();
+  await page.locator('article').filter({hasText:'Reader Test'}).getByRole('button',{name:'Use profile'}).click();
   await open('discover.html');
   await button('Refresh').click();
   await link('Test arcade').waitFor();
@@ -219,6 +233,9 @@ try {
   await button('Hide all from this publisher').click();
   await open('discover.html');
   assert.equal(await link('Test arcade').count(),0);
+  await open('writing.html');
+  assert.equal(await link('Example article',false).count(),0);
+  await open('discover.html');
   await page.getByLabel('Hidden publishers').check();
   await link('Test arcade').click();
   await button('Show this publisher').click();

@@ -2,18 +2,21 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { all, get, put, setting } from './store.js';
 import { cached } from './nostr.js';
+import { moderation } from './moderation.js';
 import { chaptersFromMarkdown } from './text.js';
 import { kinds, newestByAddress, tag, tags } from './model.js';
 
 let bundled;
-export async function books() {
+export async function books({ author = setting('account', '') } = {}) {
   bundled ??= fetch('./books/loopy-library.json').then(response => {
     if (!response.ok) throw new Error('The bundled bookshelf could not be loaded.');
     return response.json();
   }).catch(() => []);
-  const [stock, local, articles] = await Promise.all([bundled, all('books'), cached([kinds.article])]);
+  const [stock, local, articles] = await Promise.all([bundled, all('books'), cached([kinds.article], author)]);
+  const excluded = await moderation();
   const documents = new Map(stock.map(work => [work.id, work]));
   for (const event of newestByAddress(articles)) {
+    if (excluded(event)) continue;
     const identifier = tag(event, 'd');
     if (!identifier) continue;
     const id = `article:${event.pubkey}:${identifier}`;
@@ -28,7 +31,7 @@ export async function books() {
   const edits = setting('book-edits', {});
   return [...documents.values()].map(work => ({ ...work, ...edits[work.id] }));
 }
-export const findBook = async id => (await books()).find(work => work.id === id);
+export const findBook = async id => (await books({ author: '' })).find(work => work.id === id);
 export async function importBook(file) {
   if (!/\.(md|markdown|txt)$/i.test(file.name)) throw new Error('Choose a Markdown or plain text document.');
   if (file.size > 4 * 1024 * 1024) throw new Error('Choose a text file under 4 MiB.');

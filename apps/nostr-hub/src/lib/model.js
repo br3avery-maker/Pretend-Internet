@@ -1,6 +1,6 @@
 export const kinds = {
   profile: 0, note: 1, root: 15128, site: 35128, article: 30023, track: 36787,
-  playlist: 34139, relayList: 10002, blossom: 10063, appData: 30078,
+  playlist: 34139, muteList: 10000, relayList: 10002, blossom: 10063, appData: 30078,
 };
 const idPattern = /^[0-9a-f]{64}$/;
 export const validPubkey = value => typeof value === 'string' && idPattern.test(value);

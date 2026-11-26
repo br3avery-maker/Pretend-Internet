@@ -2,6 +2,8 @@ import { button, el, heading, label, link, muted, route, run, setStatus, status 
 import { kinds, matchesWords, newestByAddress, tag, tags, webURL } from '../lib/model.js';
 import { bootstrap, cached, endpoints, fetchEvents, reloadCatalog, shortKey } from '../lib/nostr.js';
 import { setting, setSetting } from '../lib/store.js';
+import { moderation } from '../lib/moderation.js';
+import { refreshIdentity } from '../lib/nostr.js';
 
 const key = event => `${event.kind}:${event.pubkey}:${tag(event, 'd')}`;
 const title = event => tag(event, 'title') || 'Untitled';
@@ -64,7 +66,7 @@ export async function render(main) {
     list.replaceChildren(...wanted.map(event => el('article', { class: 'entry split' },
       el('div', { class: 'stack-tight' }, el('h3', {}, title(event)), muted(artist(event))),
       source(event) ? button('Play', () => open(event), 'secondary') : muted('No playable URL declared'))));
-    if (refs && refs.length > ordered.length) list.append(muted(`${refs.length - ordered.length} referenced tracks are unavailable in the local cache.`));
+    if (refs && refs.length > ordered.length) list.append(muted(`${refs.length - ordered.length} referenced tracks are unavailable or filtered.`));
     if (!wanted.length) list.append(muted('No tracks match this view. Use Refresh music to look up published tracks.'));
     const resume = setting('music-position', {});
     const last = tracks.find(event => key(event) === resume.key);
@@ -72,9 +74,10 @@ export async function render(main) {
   }
   async function load() {
     const selected = playlist.value;
-    playlists = newestByAddress(await cached([kinds.playlist], account));
+    const excluded = await moderation(account);
+    playlists = newestByAddress(await cached([kinds.playlist], account)).filter(event => !excluded(event));
     const references = new Set(playlists.flatMap(event => tags(event, 'a').map(parts => parts[1])));
-    tracks = newestByAddress(await cached([kinds.track])).filter(event => !account || event.pubkey === account || references.has(key(event)));
+    tracks = newestByAddress(await cached([kinds.track])).filter(event => !excluded(event) && (!account || event.pubkey === account || references.has(key(event))));
     playlist.replaceChildren(el('option', { value: '' }, 'All tracks'), ...playlists.map(event => el('option', { value: key(event) }, title(event))));
     if (playlists.some(event => key(event) === selected)) playlist.value = selected;
     draw();
@@ -82,8 +85,10 @@ export async function render(main) {
   const refresh = button('Refresh music', async () => {});
   refresh.addEventListener('click', run(refresh, notice, async () => {
     setStatus(notice, 'Reading signed tracks and playlists.');
+    if (account) await refreshIdentity(account);
     const result = await reloadCatalog([kinds.track, kinds.playlist], account);
-    const found = newestByAddress(await cached([kinds.playlist], account));
+    const excluded = await moderation(account);
+    const found = newestByAddress(await cached([kinds.playlist], account)).filter(event => !excluded(event));
     const missing = new Map();
     const available = new Set((await cached([kinds.track])).map(key));
     for (const collection of found.slice(0, 4)) {

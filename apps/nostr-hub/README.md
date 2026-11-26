@@ -9,6 +9,7 @@ This Android-first web app brings independent sites, games, music and writing in
 - Arcade opens games at their published destinations. Music has a real audio player. The bookshelf opens long-form writing, bundled Loopy Library books and imported Markdown.
 - The reader has a chapter drawer, a full-screen reading mode, vertical scroll, horizontal chapter swipe, text settings and persistent bookmarks/position. Library curation supports collections and local metadata.
 - Publish stages a draft, presents the account and destinations for review, and distinguishes acceptance from independent relay readback. The application uses an external signer. Browsing and locally stored content do not require one.
+- Content visibility uses the active browsing profile's public signed mute list and local hidden/approved publishers across catalogs. Confirmed nsite campaign signatures are filtered from metadata only and can be reviewed using Hidden publishers in Discover. Approved publications override public mutes/campaign filtering, while manual publisher hiding takes precedence. Private encrypted mute lists are not read. Local books remain independent of the browsing profile.
 - Network uses the existing relay-router transport and separate Blossom preferences. Diagnostics live on their own screen.
 
 ## Publishing nsites
